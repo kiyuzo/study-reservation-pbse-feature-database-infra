@@ -1,0 +1,11 @@
+{
+  "version": 2,
+  "outputDirectory": "public",
+  "cleanUrls": true,
+  "rewrites": [
+    { "source": "/docs", "destination": "/index.html" },
+    { "source": "/openapi.json", "destination": "/openapi.json" },
+    { "source": "/openapi.yaml", "destination": "/openapi.yaml" },
+    { "source": "/", "destination": "/index.html" }
+  ]
+}

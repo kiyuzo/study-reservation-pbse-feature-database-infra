@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: study-reservation-api
+    runtime: node
+    plan: free
+    buildCommand: "cd service && npm ci && cp .env.example .env && npm run db:init"
+    startCommand: "cd service && npm start"
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: NODE_ENV
+        value: production
+      - key: BASE_URL
+        fromService:
+          type: web
+          name: study-reservation-api
+          property: host
+      - key: DATABASE_PATH
+        value: ./db/reservation.sqlite
