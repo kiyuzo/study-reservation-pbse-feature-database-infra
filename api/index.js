@@ -1,12 +1,9 @@
 /**
- * Vercel serverless handler.
- * /health is answered without loading SQLite/Express so the deploy stays diagnosable.
+ * Vercel Node serverless entry.
+ * No top-level requires — module load must never throw.
  */
 
-const fs = require('fs');
-const path = require('path');
-
-process.env.VERCEL = process.env.VERCEL || '1';
+process.env.VERCEL = '1';
 process.env.USE_SQLJS = '1';
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 process.env.PORT = process.env.PORT || '3000';
@@ -18,8 +15,38 @@ process.env.BASE_URL =
     ? `https://${process.env.VERCEL_URL}`
     : 'http://localhost:3000');
 
-let readyApp = null;
-let bootPromise = null;
+let cached = null;
+
+function getPathname(req) {
+  const candidates = [
+    req.url,
+    req.headers && req.headers['x-forwarded-uri'],
+    req.headers && req.headers['x-invoke-path']
+  ];
+  for (const raw of candidates) {
+    if (!raw) continue;
+    try {
+      const value = String(raw);
+      if (value.startsWith('http')) {
+        return new URL(value).pathname;
+      }
+      return value.split('?')[0];
+    } catch {
+      // try next
+    }
+  }
+  return '/';
+}
+
+function isHealthPath(pathname) {
+  return (
+    pathname === '/health' ||
+    pathname === '/v1/health' ||
+    pathname === '/api/health' ||
+    pathname === '/api/v1/health' ||
+    pathname.endsWith('/health')
+  );
+}
 
 function sendJson(res, status, body) {
   res.statusCode = status;
@@ -37,104 +64,77 @@ function sendProblem(res, err) {
       status: 500,
       detail: err && err.message ? err.message : String(err),
       bootStack:
-        err && err.stack ? String(err.stack).split('\n').slice(0, 16) : []
+        err && err.stack ? String(err.stack).split('\n').slice(0, 20) : []
     })
   );
 }
 
-async function boot() {
-  if (readyApp) {
-    return readyApp;
+async function getHandler() {
+  if (cached) return cached;
+
+  const fs = require('fs');
+  const path = require('path');
+  const serverless = require('serverless-http');
+  const initSqlJs = require('sql.js');
+
+  const wasmFile = path.join(__dirname, 'vendor', 'sql-wasm.wasm');
+  if (!fs.existsSync(wasmFile)) {
+    throw new Error(`Missing wasm at ${wasmFile}`);
   }
 
-  let initSqlJs;
-  try {
-    initSqlJs = require('sql.js');
-  } catch (err) {
-    err.message = `require(sql.js) failed: ${err.message}`;
-    throw err;
-  }
+  global.__SQLJS = await initSqlJs({
+    wasmBinary: fs.readFileSync(wasmFile)
+  });
 
-  let wasmBinary;
-  try {
-    const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm');
-    wasmBinary = fs.readFileSync(wasmPath);
-  } catch (err) {
-    err.message = `reading sql-wasm.wasm failed: ${err.message}`;
-    throw err;
-  }
+  const { ensureDatabase } = require('../service/db/ensure');
+  ensureDatabase();
 
-  try {
-    global.__SQLJS = await initSqlJs({ wasmBinary });
-  } catch (err) {
-    err.message = `initSqlJs failed: ${err.message}`;
-    throw err;
-  }
+  Object.keys(require.cache).forEach((key) => {
+    if (key.includes(`${path.sep}service${path.sep}`)) {
+      delete require.cache[key];
+    }
+  });
 
-  try {
-    const { ensureDatabase } = require('../service/db/ensure');
-    ensureDatabase();
-  } catch (err) {
-    err.message = `ensureDatabase failed: ${err.message}`;
-    throw err;
-  }
-
-  try {
-    const appPath = require.resolve('../service/src/app');
-    Object.keys(require.cache).forEach((key) => {
-      if (
-        key === appPath ||
-        key.includes(`${path.sep}service${path.sep}src${path.sep}`) ||
-        key.includes(`${path.sep}service${path.sep}db${path.sep}`)
-      ) {
-        delete require.cache[key];
-      }
-    });
-    readyApp = require('../service/src/app');
-  } catch (err) {
-    err.message = `require(app) failed: ${err.message}`;
-    throw err;
-  }
-
-  return readyApp;
-}
-
-function startBoot() {
-  if (!bootPromise) {
-    bootPromise = boot();
-  }
-  return bootPromise;
-}
-
-function pathName(req) {
-  const raw = req.url || '/';
-  return raw.split('?')[0];
+  const app = require('../service/src/app');
+  cached = serverless(app);
+  return cached;
 }
 
 module.exports = async function handler(req, res) {
-  const pathname = pathName(req);
-
-  // Always-safe health (assignment A.10) — no DB load
-  if (
-    pathname === '/health' ||
-    pathname === '/v1/health' ||
-    pathname === '/api/health' ||
-    pathname === '/api/v1/health'
-  ) {
-    return sendJson(res, 200, {
-      status: 'pass',
-      description: 'Study Room Reservation API service is healthy',
-      version: '0.1.0',
-      timestamp: new Date().toISOString(),
-      runtime: 'vercel-sqljs'
-    });
-  }
-
   try {
-    const app = await startBoot();
-    return app(req, res);
+    const pathname = getPathname(req);
+
+    if (isHealthPath(pathname)) {
+      return sendJson(res, 200, {
+        status: 'pass',
+        description: 'Study Room Reservation API service is healthy',
+        version: '0.1.0',
+        timestamp: new Date().toISOString(),
+        runtime: 'vercel',
+        path: pathname
+      });
+    }
+
+    // When /health is rewritten to /api, pathname may become "/api"
+    if (
+      (pathname === '/api' || pathname === '/api/') &&
+      String(req.method || 'GET').toUpperCase() === 'GET'
+    ) {
+      return sendJson(res, 200, {
+        status: 'pass',
+        description: 'Study Room Reservation API service is healthy',
+        version: '0.1.0',
+        timestamp: new Date().toISOString(),
+        runtime: 'vercel',
+        path: pathname,
+        note: 'rewritten-health'
+      });
+    }
+
+    const run = await getHandler();
+    return run(req, res);
   } catch (err) {
-    console.error('[api] boot/handler error:', err);
+    console.error('[api]', err);
     return sendProblem(res, err);
   }
 };

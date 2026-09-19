@@ -10,6 +10,7 @@
     "dotenv": "^16.6.1",
     "express": "^4.22.2",
     "js-yaml": "^4.3.2",
+    "serverless-http": "^4.0.0",
     "sql.js": "^1.14.2"
   }
 }

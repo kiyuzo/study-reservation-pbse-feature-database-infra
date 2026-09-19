@@ -1,7 +1,7 @@
 /**
  * SQLite driver selector.
- * - Local / CI: better-sqlite3 (native)
- * - Vercel: sql.js WASM singleton (set global.__SQLJS after async boot)
+ * - Local / CI: better-sqlite3 (native) via separate file so Vercel NFT won't load it
+ * - Vercel: sql.js WASM singleton
  */
 
 let sqlJsSingleton = null;
@@ -27,11 +27,13 @@ function createDatabase(filename) {
     return sqlJsSingleton;
   }
 
-  const BetterSqlite3 = require('better-sqlite3');
+  // Keep native require out of the Vercel traced graph when USE_SQLJS/VERCEL is set at build...
+  // NFT still may see this file; use a non-literal require for native only.
+  // eslint-disable-next-line import/no-dynamic-require, global-require
+  const BetterSqlite3 = require(['better-sqlite3'].join(''));
   return new BetterSqlite3(filename);
 }
 
-// Mimic better-sqlite3: module.exports = function Database(path) {}
 function Database(filename) {
   return createDatabase(filename);
 }

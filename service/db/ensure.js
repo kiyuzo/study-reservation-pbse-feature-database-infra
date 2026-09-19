@@ -1,6 +1,5 @@
 /**
- * Ensure a SQLite file exists (schema + seed) without wiping an existing DB.
- * Used on Vercel cold starts where DATABASE_PATH points at /tmp.
+ * Ensure SQLite exists. On Vercel, prefer schema/seed copied under api/.
  */
 
 const fs = require('fs');
@@ -14,6 +13,30 @@ function resolveDbPath(configuredPath) {
     : path.join(serviceRoot, configuredPath);
 }
 
+function readSqlFiles() {
+  const candidates = [
+    {
+      schema: path.join(__dirname, '../../api/schema.sql'),
+      seed: path.join(__dirname, '../../api/seed.sql')
+    },
+    {
+      schema: path.join(__dirname, 'schema.sql'),
+      seed: path.join(__dirname, 'seed.sql')
+    }
+  ];
+
+  for (const c of candidates) {
+    if (fs.existsSync(c.schema) && fs.existsSync(c.seed)) {
+      return {
+        schemaSql: fs.readFileSync(c.schema, 'utf8'),
+        seedSql: fs.readFileSync(c.seed, 'utf8')
+      };
+    }
+  }
+
+  throw new Error('schema.sql / seed.sql not found next to function or in service/db');
+}
+
 function ensureDatabase() {
   const configuredPath = process.env.DATABASE_PATH || './db/reservation.sqlite';
   const dbPath = resolveDbPath(configuredPath);
@@ -23,9 +46,7 @@ function ensureDatabase() {
   }
 
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-
-  const schemaSql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
-  const seedSql = fs.readFileSync(path.join(__dirname, 'seed.sql'), 'utf8');
+  const { schemaSql, seedSql } = readSqlFiles();
 
   const db = new Database(dbPath);
   try {

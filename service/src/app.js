@@ -30,9 +30,13 @@ function assertRequiredConfig() {
   });
 
   if (missing.length > 0) {
-    console.error(
-      `[service] Refusing to start — missing required environment variable(s): ${missing.join(', ')}`
-    );
+    const message =
+      `[service] Refusing to start — missing required environment variable(s): ${missing.join(', ')}`;
+    // process.exit kills the whole Vercel isolate → FUNCTION_INVOCATION_FAILED
+    if (process.env.VERCEL) {
+      throw new Error(message);
+    }
+    console.error(message);
     console.error(
       '[service] Copy service/.env.example to service/.env and set every listed variable.'
     );
@@ -41,9 +45,12 @@ function assertRequiredConfig() {
 
   const port = Number(process.env.PORT);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    console.error(
-      `[service] Refusing to start — PORT must be an integer 1–65535 (got "${process.env.PORT}")`
-    );
+    const message =
+      `[service] Refusing to start — PORT must be an integer 1–65535 (got "${process.env.PORT}")`;
+    if (process.env.VERCEL) {
+      throw new Error(message);
+    }
+    console.error(message);
     process.exit(1);
   }
 }

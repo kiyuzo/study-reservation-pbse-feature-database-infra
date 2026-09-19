@@ -1,15 +1,19 @@
 {
   "version": 2,
   "installCommand": "npm install",
-  "buildCommand": "node -e \"console.log('vercel build ok; runtime=node20 sql.js')\"",
   "functions": {
     "api/index.js": {
-      "includeFiles": "{service/db/**,service/src/**,openapi.yaml,openapi.json,node_modules/sql.js/dist/**}",
       "memory": 1024,
       "maxDuration": 30
     }
   },
   "rewrites": [
-    { "source": "/(.*)", "destination": "/api" }
+    { "source": "/health", "destination": "/api" },
+    { "source": "/v1/health", "destination": "/api" },
+    { "source": "/v1/:path*", "destination": "/api" },
+    { "source": "/docs", "destination": "/api" },
+    { "source": "/docs/:path*", "destination": "/api" },
+    { "source": "/openapi.json", "destination": "/api" },
+    { "source": "/openapi.yaml", "destination": "/api" }
   ]
 }
