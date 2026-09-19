@@ -4,10 +4,12 @@ This directory contains the backend implementation for the Study Room Reservatio
 
 ## Deployed URL
 
-- **Production URL:** `https://study-reservation-pbse-feature-data.vercel.app`
-- **Health Check:** `https://study-reservation-pbse-feature-data.vercel.app/health`
+- **Production URL:** https://study-reservation-pbse-feature-data.vercel.app
+- **Health Check:** https://study-reservation-pbse-feature-data.vercel.app/health
 
-> If `/health` returns `FUNCTION_INVOCATION_FAILED`, Production is still on an old commit. Promote the latest **`p3-fixed`** Preview deployment to Production (steps below).
+Verified on Production (`bbada02`): `/health`, `GET /v1/rooms`, create reservation, get by id, and idempotent replay.
+
+> Cold starts can take a few seconds. SQLite on Vercel is in-memory per isolate; prove A.7 process-restart locally.
 
 ---
 
