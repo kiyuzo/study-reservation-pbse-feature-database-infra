@@ -2,6 +2,8 @@
 
 The Study Room Reservation API is the **resource server**: it never receives passwords and never issues tokens. Keycloak issues access tokens; the service verifies them via JWKS.
 
+**Teammate handoff (branch `p4-rama`, continue from Step 4):** [`docs/P4-teammate-handoff.md`](../docs/P4-teammate-handoff.md)
+
 ## Prerequisites
 
 - Docker Desktop (or Docker Engine + Compose)

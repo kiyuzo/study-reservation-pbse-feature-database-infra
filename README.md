@@ -15,6 +15,14 @@ A student checks the availability of study rooms in the library on a given date 
 
 ---
 
+## Session 4 (P4) — teammate handoff
+
+Steps **0–3** (auth decisions, scopes, local Keycloak) live on branch **`p4-rama`**. Teammates continuing from **Step 4** should start here:
+
+→ **[`docs/P4-teammate-handoff.md`](docs/P4-teammate-handoff.md)**
+
+---
+
 ## 📁 Repository Structure
 
 ```
@@ -24,8 +32,11 @@ A student checks the availability of study rooms in the library on a given date 
 ├── README.md                    # Root project documentation & test analysis
 ├── .gitignore                   # Ignore node_modules, .env, DB files
 ├── docs/
+│   ├── P4-teammate-handoff.md    # Session 4: continue from Step 4
 │   └── decisions/
-│       └── 0002-implementasi.md # Architecture decision record
+│       ├── 0002-implementasi.md # Architecture decision record
+│       └── 0003-autentikasi.md  # Auth clients, scopes, Keycloak decisions
+├── infra/                       # Local Keycloak (P4 Step 3)
 ├── service/                     # Backend service implementation
 │   ├── package.json
 │   ├── .env.example

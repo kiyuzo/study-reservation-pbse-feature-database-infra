@@ -178,3 +178,5 @@ Scopes are derived from actor capabilities, not one-per-endpoint. Exact strings 
 `rooms:display`, `reservations:checkin`, and `reservations:cleanup` are registered now for display/job clients even though check-in and cleanup routes are not yet in the contract.
 
 Auth decisions (clients, Keycloak, test tokens): [`docs/decisions/0003-autentikasi.md`](../docs/decisions/0003-autentikasi.md). Local IdP: [`infra/README.md`](../infra/README.md).
+
+**Teammates continuing from Step 4:** see [`docs/P4-teammate-handoff.md`](../docs/P4-teammate-handoff.md).
