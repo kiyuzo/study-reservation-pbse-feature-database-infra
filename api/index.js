@@ -1,10 +1,9 @@
 /**
- * Vercel serverless entry — boots sql.js (WASM), ensures /tmp DB, exports Express.
+ * Vercel serverless handler (req, res) — boots sql.js then delegates to Express.
  */
 
 const fs = require('fs');
 const path = require('path');
-const express = require('express');
 
 process.env.VERCEL = process.env.VERCEL || '1';
 process.env.USE_SQLJS = '1';
@@ -25,30 +24,27 @@ if (!module.paths.includes(serviceModules)) {
 
 let readyApp = null;
 let bootPromise = null;
-let bootError = null;
 
 async function boot() {
   if (readyApp) {
     return readyApp;
   }
-  if (bootError) {
-    throw bootError;
-  }
 
   const initSqlJs = require('sql.js');
   const wasmPath = require.resolve('sql.js/dist/sql-wasm.wasm');
   const wasmBinary = fs.readFileSync(wasmPath);
-  const SQL = await initSqlJs({ wasmBinary });
-  global.__SQLJS = SQL;
+  global.__SQLJS = await initSqlJs({ wasmBinary });
 
   const { ensureDatabase } = require('../service/db/ensure');
   ensureDatabase();
 
-  // Clear require cache so stores pick up sql.js driver after __SQLJS is set
   const appPath = require.resolve('../service/src/app');
-  delete require.cache[appPath];
   Object.keys(require.cache).forEach((key) => {
-    if (key.includes(`${path.sep}service${path.sep}src${path.sep}`)) {
+    if (
+      key === appPath ||
+      key.includes(`${path.sep}service${path.sep}src${path.sep}`) ||
+      key.includes(`${path.sep}service${path.sep}db${path.sep}`)
+    ) {
       delete require.cache[key];
     }
   });
@@ -59,30 +55,28 @@ async function boot() {
 
 function startBoot() {
   if (!bootPromise) {
-    bootPromise = boot().catch((err) => {
-      bootError = err;
-      console.error('[api] boot failed:', err);
-      throw err;
-    });
+    bootPromise = boot();
   }
   return bootPromise;
 }
 
-const gateway = express();
-gateway.use(async (req, res) => {
+module.exports = async function handler(req, res) {
   try {
     const app = await startBoot();
     return app(req, res);
   } catch (err) {
-    console.error('[api] request boot error:', err);
-    res.status(500).type('application/problem+json').json({
-      type: 'https://api.library.example/problems/internal-server-error',
-      title: 'Internal Server Error',
-      status: 500,
-      detail: err && err.message ? err.message : String(err),
-      bootStack: err && err.stack ? String(err.stack).split('\n').slice(0, 12) : []
-    });
+    console.error('[api] boot/handler error:', err);
+    res.statusCode = 500;
+    res.setHeader('Content-Type', 'application/problem+json; charset=utf-8');
+    res.end(
+      JSON.stringify({
+        type: 'https://api.library.example/problems/internal-server-error',
+        title: 'Internal Server Error',
+        status: 500,
+        detail: err && err.message ? err.message : String(err),
+        bootStack:
+          err && err.stack ? String(err.stack).split('\n').slice(0, 12) : []
+      })
+    );
   }
-});
-
-module.exports = gateway;
+};
