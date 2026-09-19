@@ -112,7 +112,9 @@ const { notFoundHandler, problemHandler } = require('./problem');
 app.use(notFoundHandler);
 app.use(problemHandler);
 
-if (NODE_ENV !== 'test') {
+// Vercel runs this as a serverless function — do not call listen().
+const isVercel = Boolean(process.env.VERCEL);
+if (NODE_ENV !== 'test' && !isVercel) {
   app.listen(PORT, () => {
     console.log(`[service] Study Reservation API running on ${BASE_URL}`);
     console.log(`[service] Health endpoint: ${BASE_URL}/health`);

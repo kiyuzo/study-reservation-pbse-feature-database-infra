@@ -4,37 +4,45 @@ This directory contains the backend implementation for the Study Room Reservatio
 
 ## Deployed URL
 
-- **Production URL:** `REPLACE_AFTER_RENDER_DEPLOY` (paste `https://….onrender.com` here after deploy)
-- **Health Check:** `REPLACE_AFTER_RENDER_DEPLOY/health`
+- **Production URL:** `REPLACE_AFTER_VERCEL_DEPLOY` (paste `https://….vercel.app` here after deploy)
+- **Health Check:** `REPLACE_AFTER_VERCEL_DEPLOY/health`
 
-> Free Render instances spin down when idle. The first request after sleep can take 30–60s.
+> First request after a cold start can be slow. SQLite on Vercel lives under `/tmp` and can reset between cold starts — prove A.7 restart locally.
 
 ---
 
-## Deploy (Render free)
+## Deploy (Vercel free / Hobby)
 
-No paid disk. Env vars match [`../render.yaml`](../render.yaml) and [`.env.example`](.env.example): `PORT`, `NODE_ENV`, `BASE_URL`, `DATABASE_PATH`.
+No card required for typical Hobby signup. Branch: **`p3-fixed`** (not `main`).
 
-1. Push this work on branch **`p3-fixed`** (not `main`).
-2. Sign up at [render.com](https://render.com) with GitHub.
-3. **New → Blueprint** (uses root `render.yaml`) **or** **Web Service** from repo `kiyuzo/study-reservation-pbse-feature-database-infra`, branch **`p3-fixed`**.
-4. Confirm build/start:
-   - Build: `cd service && npm ci && cp .env.example .env && npm run db:init`
-   - Start: `cd service && npm start`
-5. After deploy, copy the public URL into **Production URL** above.
-6. In Render → Environment, set `BASE_URL` to that full URL (including `https://`, no trailing slash) if the auto `host` value is incomplete.
-7. Open `/health` — expect `200` with `"status":"pass"`.
+1. Push the Vercel files on **`p3-fixed`**.
+2. Sign up at [vercel.com](https://vercel.com) with GitHub.
+3. **Add New… → Project** → import `kiyuzo/study-reservation-pbse-feature-database-infra`.
+4. Set:
+   - **Framework Preset:** Other  
+   - **Root Directory:** `.` (repo root — uses root `vercel.json` + `api/index.js`)  
+   - **Branch:** `p3-fixed`  
+5. Environment Variables (Production):
+   - `NODE_ENV` = `production`
+   - `PORT` = `3000`
+   - `DATABASE_PATH` = `/tmp/reservation.sqlite`
+   - `BASE_URL` = leave empty first deploy (or set to the `*.vercel.app` URL after you see it)
+6. Deploy. Copy the URL into **Production URL** above.
+7. If `BASE_URL` was empty, set it to `https://your-project.vercel.app` (no trailing slash) and redeploy.
+8. Open `/health` — expect `200` with `"status":"pass"`.
 
-**Ephemeral disk:** runtime writes can disappear after sleep/redeploy. Assignment A.7 (survive process restart) is demonstrated **locally** with the same code (see demo sheet below).
+**How it works:** `api/index.js` exports the Express app; `service/db/ensure.js` creates schema+seed in `/tmp` on cold start if missing. Do not call `app.listen` on Vercel.
+
+**Ephemeral `/tmp`:** writes may disappear after a cold start. Assignment A.7 (survive process restart) is demonstrated **locally** (see below).
 
 ---
 
 ## Grader demo cheat sheet
 
-### Live (public URL, keep instance warm)
+### Live (public URL)
 
 ```bash
-BASE=REPLACE_AFTER_RENDER_DEPLOY   # e.g. https://study-reservation-api.onrender.com
+BASE=REPLACE_AFTER_VERCEL_DEPLOY   # e.g. https://study-reservation-xxx.vercel.app
 
 curl -s "$BASE/health"
 curl -s "$BASE/v1/rooms"

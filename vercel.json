@@ -1,11 +1,15 @@
 {
   "version": 2,
-  "outputDirectory": "public",
-  "cleanUrls": true,
+  "installCommand": "npm install",
+  "buildCommand": "npm rebuild better-sqlite3",
+  "functions": {
+    "api/index.js": {
+      "includeFiles": "service/db/**",
+      "memory": 1024,
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
-    { "source": "/docs", "destination": "/index.html" },
-    { "source": "/openapi.json", "destination": "/openapi.json" },
-    { "source": "/openapi.yaml", "destination": "/openapi.yaml" },
-    { "source": "/", "destination": "/index.html" }
+    { "source": "/(.*)", "destination": "/api" }
   ]
 }

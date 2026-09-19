@@ -14,13 +14,13 @@ Furthermore, Assignment Section A.11 mandates documenting the choice of hosting 
 ## Decision
 
 ### 1. Hosting Provider
-- **Decision:** Deploy as a Node.js web service on **Render free** (Blueprint via root `render.yaml`). No paid persistent disk for this session (course constraint: no spend).
+- **Decision:** Deploy the Express API on **Vercel** (Hobby / free) via root `api/index.js` + `vercel.json`. Course constraint: no paid hosting.
 - **Rationale:**
-  - Supports Node.js 20 and `/health` without dependency checks (assignment A.10).
-  - Public HTTPS URL satisfies “reachable outside a member’s laptop.”
-  - Env vars (`PORT`, `NODE_ENV`, `BASE_URL`, `DATABASE_PATH`) come from Render / `.env`, never from committed secrets.
-- **Free-tier filesystem caveat:** Render free disk is **ephemeral**. Sleep, restart, or redeploy can wipe runtime SQLite writes. Schema and seed still come from committed `schema.sql` / `seed.sql` on each build (`db:init`).
-- **A.7 restart verification:** Prove process restart survival **locally** (stop Node → start → read back) with the same SQLite + `idempotency_keys` implementation. Live URL is used for warm-instance read/write demos.
+  - Other cohort teams already use Vercel; signup typically needs no credit card.
+  - Public HTTPS `*.vercel.app` URL satisfies “reachable outside a member’s laptop.”
+  - Env vars (`PORT`, `NODE_ENV`, `BASE_URL`, `DATABASE_PATH`) are set in the Vercel project, never committed.
+- **Serverless + SQLite caveat:** Vercel runs Express as a serverless function. SQLite is opened under **`/tmp/reservation.sqlite`**, created on cold start by `service/db/ensure.js` from committed `schema.sql` / `seed.sql`. `/tmp` is **ephemeral** across cold starts; concurrent instances do not share one disk.
+- **A.7 restart verification:** Prove process restart survival **locally** (stop Node → start → read back) with the same SQLite + `idempotency_keys` code. Live URL is used for warm read/write demos.
 
 ### 2. Idempotency Storage
 - **Decision:** Dedicated SQLite table `idempotency_keys` committed in `service/db/schema.sql`, accessed exclusively via `service/src/store/idempotency.js`.
@@ -74,7 +74,7 @@ Furthermore, Assignment Section A.11 mandates documenting the choice of hosting 
 ## Consequences
 
 - **Durability Across Process Restarts:** Idempotency keys and reservations live in SQLite (`idempotency_keys` / `reservations`), not in memory — verified by local stop/start.
-- **Cloud free tier:** Do not treat Render free as durable storage; expect seed reset after cold start unless a paid disk is added later.
+- **Cloud free tier:** Do not treat Vercel `/tmp` as durable storage; expect seed re-init after cold starts. Paid external DB was deferred (no-spend rule).
 - **Contract Conformance:** API clients receive deterministic, standardized `application/problem+json` errors matching `openapi.yaml`.
 - **Zero Conflict Development:** Person 3 (`reservations.js`) consumes Person 4's idempotency store (`store/idempotency.js`) without modifying each other's core implementation files.
 - **Continuous Quality Assurance:** Automated GitHub Actions CI executes on every push and PR (including `p3-fixed`), with Jest serialised (`maxWorkers: 1` / `--runInBand`) so shared SQLite tests do not race.
