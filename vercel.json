@@ -10,10 +10,9 @@
   },
   "rewrites": [
     { "source": "/health", "destination": "/api" },
-    { "source": "/v1/health", "destination": "/api" },
-    { "source": "/v1/:path*", "destination": "/api" },
+    { "source": "/v1/(.*)", "destination": "/api" },
     { "source": "/docs", "destination": "/api" },
-    { "source": "/docs/:path*", "destination": "/api" },
+    { "source": "/docs/(.*)", "destination": "/api" },
     { "source": "/openapi.json", "destination": "/api" },
     { "source": "/openapi.yaml", "destination": "/api" }
   ]
