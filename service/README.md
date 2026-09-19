@@ -4,55 +4,63 @@ This directory contains the backend implementation for the Study Room Reservatio
 
 ## Deployed URL
 
-- **Production URL:** `REPLACE_AFTER_VERCEL_DEPLOY` (paste `https://….vercel.app` here after deploy)
-- **Health Check:** `REPLACE_AFTER_VERCEL_DEPLOY/health`
+- **Production URL:** `https://study-reservation-pbse-feature-data.vercel.app`
+- **Health Check:** `https://study-reservation-pbse-feature-data.vercel.app/health`
 
-> First request after a cold start can be slow. SQLite on Vercel lives under `/tmp` and can reset between cold starts — prove A.7 restart locally.
+> If `/health` returns `FUNCTION_INVOCATION_FAILED`, Production is still on an old commit. Promote the latest **`p3-fixed`** Preview deployment to Production (steps below).
 
 ---
 
 ## Deploy (Vercel free / Hobby)
 
-No card required for typical Hobby signup. Branch: **`p3-fixed`** (not `main`).
+Branch: **`p3-fixed`** (not `main`). Node.js **20.x**.
 
-1. Push the Vercel files on **`p3-fixed`**.
-2. Sign up at [vercel.com](https://vercel.com) with GitHub.
-3. **Add New… → Project** → import `kiyuzo/study-reservation-pbse-feature-database-infra`.
-4. Set:
-   - **Framework Preset:** Other  
-   - **Root Directory:** `.` (repo root — uses root `vercel.json` + `api/index.js`)  
-   - **Branch:** `p3-fixed`  
-5. Environment Variables (Production):
-   - `NODE_ENV` = `production`
-   - `PORT` = `3000`
-   - `DATABASE_PATH` = `/tmp/reservation.sqlite`
-   - `BASE_URL` = leave empty first deploy (or set to the `*.vercel.app` URL after you see it)
-6. Deploy. Copy the URL into **Production URL** above.
-7. If `BASE_URL` was empty, set it to `https://your-project.vercel.app` (no trailing slash) and redeploy.
-8. Open `/health` — expect `200` with `"status":"pass"`.
+### One-time project settings (required)
 
-**How it works:** `api/index.js` exports the Express app; `service/db/ensure.js` creates schema+seed in `/tmp` on cold start if missing. Do not call `app.listen` on Vercel.
+1. Vercel → Project → **Settings → General → Node.js Version** → **20.x**
+2. **Settings → Git → Production Branch** → set to **`p3-fixed`** (or keep `main` and use Promote below)
+3. **Settings → Deployment Protection** → turn **off** Vercel Authentication for Production  
+   (Preview SSO returns HTML login pages instead of the API — graders cannot use a protected Preview URL)
 
-**Ephemeral `/tmp`:** writes may disappear after a cold start. Assignment A.7 (survive process restart) is demonstrated **locally** (see below).
+### Promote latest fix to Production
+
+1. Vercel → **Deployments**
+2. Open the latest deployment from branch **`p3-fixed`** (commit message about Vercel/sql.js/`_vendor`)
+3. **⋯ → Promote to Production**
+4. Wait until Production is Ready
+5. Test: `https://study-reservation-pbse-feature-data.vercel.app/health`  
+   Expect JSON: `{"status":"pass",...}` — **not** HTML and **not** `FUNCTION_INVOCATION_FAILED`
+
+### Env vars (Production)
+
+- `NODE_ENV` = `production`
+- `PORT` = `3000`
+- `DATABASE_PATH` = `/tmp/reservation.sqlite`
+- `BASE_URL` = `https://study-reservation-pbse-feature-data.vercel.app`
+
+### How it works
+
+- `api/index.js` boots **sql.js** (WASM under `api/_vendor/`, not a native addon)
+- `serverless-http` adapts Express
+- SQLite file is created under `/tmp` on cold start from `api/schema.sql` + `api/seed.sql`
+- A.7 restart demo is still done **locally** (Vercel `/tmp` is ephemeral)
 
 ---
 
 ## Grader demo cheat sheet
 
-### Live (public URL)
+### Live (public Production URL)
 
 ```bash
-BASE=REPLACE_AFTER_VERCEL_DEPLOY   # e.g. https://study-reservation-xxx.vercel.app
+BASE=https://study-reservation-pbse-feature-data.vercel.app
 
 curl -s "$BASE/health"
 curl -s "$BASE/v1/rooms"
 
-KEY=$(uuidgen)   # or any UUID v4
+KEY=$(uuidgen)
 curl -s -D - -X POST "$BASE/v1/reservations" \
   -H "Idempotency-Key: $KEY" -H "Content-Type: application/json" \
   -d '{"roomId":"rm_1a2B3cD","date":"2026-12-15","startTime":"08:00","endTime":"09:00"}'
-# note the returned id, then:
-curl -s "$BASE/v1/reservations/<id>"
 ```
 
 ### Local restart + idempotency (A.7 / A.8)
@@ -61,8 +69,8 @@ curl -s "$BASE/v1/reservations/<id>"
 cd service
 cp .env.example .env
 npm ci && npm run db:init && npm start
-# In another terminal — create, then POST again with the SAME key; expect one row / identical body.
-# Stop the Node process (Ctrl+C), start again with npm start, GET the same id — entity must still exist.
+# create → POST again with SAME key → one row
+# Ctrl+C → npm start → GET same id still exists
 ```
 
 ---
