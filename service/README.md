@@ -147,3 +147,34 @@ npm ci && npm run db:init && npm start
    ```bash
    npm run test:contract
    ```
+
+---
+
+## Scope vocabulary (Session 4 / P4 Step 2)
+
+Scopes are derived from actor capabilities, not one-per-endpoint. Exact strings below are reused on the authorisation server (Step 3), in `openapi.yaml` (Step 4), and by `requireScope` (Step 7). A scope permits a *kind* of operation; Layer 3 (object ownership) decides which records are visible.
+
+| Scope | Permits | Student | Display | Job |
+|-------|---------|---------|---------|-----|
+| `rooms:read` | Browse rooms and room details | yes | yes | — |
+| `reservations:read` | Read reservations visible to the principal | yes | yes | — |
+| `reservations:write` | Create and cancel own reservations | yes | — | — |
+| `rooms:display` | Sync schedule / status for an assigned room | — | yes | — |
+| `reservations:checkin` | Check a reservation in at a room | — | yes | — |
+| `reservations:cleanup` | Mark abandoned reservations (e.g. no-show) | — | — | yes |
+
+### Current OpenAPI operation → scope
+
+| Operation ID | Scope |
+|--------------|-------|
+| `getHealth` | *(public — no token)* |
+| `listRooms` | `rooms:read` |
+| `getRoom` | `rooms:read` |
+| `listReservations` | `reservations:read` |
+| `getReservation` | `reservations:read` |
+| `createReservation` | `reservations:write` |
+| `cancelReservation` | `reservations:write` |
+
+`rooms:display`, `reservations:checkin`, and `reservations:cleanup` are registered now for display/job clients even though check-in and cleanup routes are not yet in the contract.
+
+Auth decisions (clients, Keycloak, test tokens): [`docs/decisions/0003-autentikasi.md`](../docs/decisions/0003-autentikasi.md). Local IdP: [`infra/README.md`](../infra/README.md).
