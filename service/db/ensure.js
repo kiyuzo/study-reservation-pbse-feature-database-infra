@@ -54,7 +54,11 @@ function ensureDatabase() {
     db.exec(schemaSql);
     db.exec(seedSql);
   } finally {
+    // Persist + close, then drop singleton so stores open a fresh handle
     db.close();
+    if (typeof Database.resetSqlJsSingleton === 'function') {
+      Database.resetSqlJsSingleton();
+    }
   }
 
   console.log(`[db:ensure] Created and seeded database at ${dbPath}`);

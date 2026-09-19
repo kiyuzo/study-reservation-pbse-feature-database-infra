@@ -1,7 +1,7 @@
 /**
  * SQLite driver selector.
- * - Local / CI: better-sqlite3 (native) via separate file so Vercel NFT won't load it
- * - Vercel: sql.js WASM singleton
+ * - Local / CI: better-sqlite3 (native)
+ * - Vercel: sql.js WASM singleton (must not reuse a closed handle)
  */
 
 let sqlJsSingleton = null;
@@ -16,7 +16,11 @@ function createDatabase(filename) {
       );
     }
 
-    if (sqlJsSingleton && sqlJsSingletonPath === filename) {
+    if (
+      sqlJsSingleton &&
+      sqlJsSingletonPath === filename &&
+      !sqlJsSingleton.closed
+    ) {
       return sqlJsSingleton;
     }
 
@@ -27,8 +31,6 @@ function createDatabase(filename) {
     return sqlJsSingleton;
   }
 
-  // Keep native require out of the Vercel traced graph when USE_SQLJS/VERCEL is set at build...
-  // NFT still may see this file; use a non-literal require for native only.
   // eslint-disable-next-line import/no-dynamic-require, global-require
   const BetterSqlite3 = require(['better-sqlite3'].join(''));
   return new BetterSqlite3(filename);
@@ -38,5 +40,11 @@ function Database(filename) {
   return createDatabase(filename);
 }
 
+function resetSqlJsSingleton() {
+  sqlJsSingleton = null;
+  sqlJsSingletonPath = null;
+}
+
 module.exports = Database;
 module.exports.createDatabase = createDatabase;
+module.exports.resetSqlJsSingleton = resetSqlJsSingleton;

@@ -98,7 +98,12 @@ function createSqlJsDatabase(SQL) {
 
     close() {
       this.persist();
-      this.db.close();
+      try {
+        this.db.close();
+      } catch {
+        // already closed
+      }
+      this.closed = true;
     }
   }
 
