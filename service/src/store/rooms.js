@@ -17,11 +17,10 @@
 const path = require('path');
 const Database = require('../db/driver');
 
-const configuredPath = process.env.DATABASE_PATH;
-
-const dbPath = path.isAbsolute(configuredPath)
-  ? configuredPath
-  : path.join(__dirname, '..', '..', configuredPath);
+const dbPath = Database.resolveDbPath(
+  process.env.DATABASE_PATH,
+  path.join(__dirname, '..', '..')
+);
 
 const db = new Database(dbPath);
 

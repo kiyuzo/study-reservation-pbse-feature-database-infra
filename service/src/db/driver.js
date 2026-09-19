@@ -1,11 +1,24 @@
 /**
- * SQLite driver selector.
+ * Shared DB path resolver + driver selector.
  * - Local / CI: better-sqlite3 (native)
- * - Vercel: sql.js WASM singleton (must not reuse a closed handle)
+ * - Vercel: sql.js WASM singleton
  */
+
+const path = require('path');
 
 let sqlJsSingleton = null;
 let sqlJsSingletonPath = null;
+
+function resolveDbPath(configuredPath, fromDir) {
+  if (!configuredPath || configuredPath === ':memory:') {
+    return ':memory:';
+  }
+  if (path.isAbsolute(configuredPath)) {
+    return configuredPath;
+  }
+  const base = fromDir || path.join(__dirname, '..', '..');
+  return path.join(base, configuredPath);
+}
 
 function createDatabase(filename) {
   if (process.env.VERCEL || process.env.USE_SQLJS === '1') {
@@ -47,4 +60,5 @@ function resetSqlJsSingleton() {
 
 module.exports = Database;
 module.exports.createDatabase = createDatabase;
+module.exports.resolveDbPath = resolveDbPath;
 module.exports.resetSqlJsSingleton = resetSqlJsSingleton;

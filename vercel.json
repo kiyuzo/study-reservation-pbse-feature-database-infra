@@ -3,9 +3,9 @@
   "installCommand": "npm install",
   "functions": {
     "api/index.js": {
-      "includeFiles": "api/_vendor/**",
+      "includeFiles": "{api/_vendor/**,api/schema.sql,api/seed.sql}",
       "memory": 1024,
-      "maxDuration": 30
+      "maxDuration": 60
     }
   },
   "rewrites": [

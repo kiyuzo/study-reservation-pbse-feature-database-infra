@@ -97,6 +97,10 @@ function createSqlJsDatabase(SQL) {
     }
 
     close() {
+      // Keep :memory: singleton alive for the isolate lifetime
+      if (this.filename === ':memory:') {
+        return;
+      }
       this.persist();
       try {
         this.db.close();

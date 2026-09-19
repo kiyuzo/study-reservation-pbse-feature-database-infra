@@ -7,45 +7,27 @@ process.env.VERCEL = '1';
 process.env.USE_SQLJS = '1';
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
 process.env.PORT = process.env.PORT || '3000';
-process.env.DATABASE_PATH =
-  process.env.DATABASE_PATH || '/tmp/reservation.sqlite';
+// In-memory DB avoids /tmp I/O hangs on some Vercel runtimes
+process.env.DATABASE_PATH = process.env.DATABASE_PATH || ':memory:';
 process.env.BASE_URL =
   process.env.BASE_URL ||
   (process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
     : 'http://localhost:3000');
 
-let cached = null;
+let bootPromise = null;
+let expressApp = null;
 
 function getPathname(req) {
-  const candidates = [
-    req.url,
-    req.headers && req.headers['x-forwarded-uri'],
-    req.headers && req.headers['x-invoke-path']
-  ];
-  for (const raw of candidates) {
-    if (!raw) continue;
-    try {
-      const value = String(raw);
-      if (value.startsWith('http')) {
-        return new URL(value).pathname;
-      }
-      return value.split('?')[0];
-    } catch {
-      // try next
+  const raw = (req && req.url) || '/';
+  try {
+    if (String(raw).startsWith('http')) {
+      return new URL(String(raw)).pathname;
     }
+  } catch {
+    // ignore
   }
-  return '/';
-}
-
-function isHealthPath(pathname) {
-  return (
-    pathname === '/health' ||
-    pathname === '/v1/health' ||
-    pathname === '/api/health' ||
-    pathname === '/api/v1/health' ||
-    pathname.endsWith('/health')
-  );
+  return String(raw).split('?')[0];
 }
 
 function sendJson(res, status, body) {
@@ -69,12 +51,13 @@ function sendProblem(res, err) {
   );
 }
 
-async function getHandler() {
-  if (cached) return cached;
+async function boot() {
+  if (expressApp) {
+    return expressApp;
+  }
 
   const fs = require('fs');
   const path = require('path');
-  const serverless = require('serverless-http');
   const initSqlJs = require('sql.js');
 
   const wasmFile = path.join(__dirname, '_vendor', 'sql-wasm.wasm');
@@ -86,25 +69,36 @@ async function getHandler() {
     wasmBinary: fs.readFileSync(wasmFile)
   });
 
+  // Force memory DB for this isolate
+  process.env.DATABASE_PATH = ':memory:';
+
   const { ensureDatabase } = require('../service/db/ensure');
   ensureDatabase();
 
-  Object.keys(require.cache).forEach((key) => {
-    if (key.includes(`${path.sep}service${path.sep}`)) {
-      delete require.cache[key];
-    }
-  });
+  // Load app once; do not wipe the whole require cache (can deadlock)
+  expressApp = require('../service/src/app');
+  return expressApp;
+}
 
-  const app = require('../service/src/app');
-  cached = serverless(app);
-  return cached;
+function startBoot() {
+  if (!bootPromise) {
+    bootPromise = boot().catch((err) => {
+      bootPromise = null;
+      throw err;
+    });
+  }
+  return bootPromise;
 }
 
 module.exports = async function handler(req, res) {
   try {
     const pathname = getPathname(req);
 
-    if (isHealthPath(pathname)) {
+    if (
+      pathname === '/health' ||
+      pathname === '/v1/health' ||
+      pathname.endsWith('/health')
+    ) {
       return sendJson(res, 200, {
         status: 'pass',
         description: 'Study Room Reservation API service is healthy',
@@ -115,24 +109,8 @@ module.exports = async function handler(req, res) {
       });
     }
 
-    // When /health is rewritten to /api, pathname may become "/api"
-    if (
-      (pathname === '/api' || pathname === '/api/') &&
-      String(req.method || 'GET').toUpperCase() === 'GET'
-    ) {
-      return sendJson(res, 200, {
-        status: 'pass',
-        description: 'Study Room Reservation API service is healthy',
-        version: '0.1.0',
-        timestamp: new Date().toISOString(),
-        runtime: 'vercel',
-        path: pathname,
-        note: 'rewritten-health'
-      });
-    }
-
-    const run = await getHandler();
-    return run(req, res);
+    const app = await startBoot();
+    return app(req, res);
   } catch (err) {
     console.error('[api]', err);
     return sendProblem(res, err);

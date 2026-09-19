@@ -36,10 +36,10 @@ const Database = require('../db/driver');
  * Returns a configured Database instance.
  */
 function getDatabase() {
-  const configuredPath = process.env.DATABASE_PATH || './db/reservation.sqlite';
-  const dbPath = path.isAbsolute(configuredPath)
-    ? configuredPath
-    : path.resolve(__dirname, '..', '..', configuredPath);
+  const dbPath = Database.resolveDbPath(
+    process.env.DATABASE_PATH || './db/reservation.sqlite',
+    path.join(__dirname, '..', '..')
+  );
 
   const db = new Database(dbPath);
   db.pragma('foreign_keys = ON');

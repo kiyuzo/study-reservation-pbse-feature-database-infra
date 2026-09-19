@@ -1,5 +1,6 @@
 /**
- * Ensure SQLite exists. On Vercel, prefer schema/seed copied under api/.
+ * Ensure SQLite exists. On Vercel, prefer schema/seed under api/.
+ * For :memory:, always seed into the live sql.js singleton (do not close it).
  */
 
 const fs = require('fs');
@@ -7,10 +8,10 @@ const path = require('path');
 const Database = require('../src/db/driver');
 
 function resolveDbPath(configuredPath) {
-  const serviceRoot = path.join(__dirname, '..');
-  return path.isAbsolute(configuredPath)
-    ? configuredPath
-    : path.join(serviceRoot, configuredPath);
+  return Database.resolveDbPath(
+    configuredPath,
+    path.join(__dirname, '..')
+  );
 }
 
 function readSqlFiles() {
@@ -40,21 +41,29 @@ function readSqlFiles() {
 function ensureDatabase() {
   const configuredPath = process.env.DATABASE_PATH || './db/reservation.sqlite';
   const dbPath = resolveDbPath(configuredPath);
+  const { schemaSql, seedSql } = readSqlFiles();
+
+  // :memory: — always (re)apply into the shared singleton; never close it
+  if (dbPath === ':memory:') {
+    const db = new Database(dbPath);
+    db.pragma('foreign_keys = ON');
+    db.exec(schemaSql);
+    db.exec(seedSql);
+    console.log('[db:ensure] Seeded in-memory database for Vercel');
+    return dbPath;
+  }
 
   if (fs.existsSync(dbPath)) {
     return dbPath;
   }
 
   fs.mkdirSync(path.dirname(dbPath), { recursive: true });
-  const { schemaSql, seedSql } = readSqlFiles();
-
   const db = new Database(dbPath);
   try {
     db.pragma('foreign_keys = ON');
     db.exec(schemaSql);
     db.exec(seedSql);
   } finally {
-    // Persist + close, then drop singleton so stores open a fresh handle
     db.close();
     if (typeof Database.resetSqlJsSingleton === 'function') {
       Database.resetSqlJsSingleton();
