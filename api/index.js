@@ -77,7 +77,7 @@ async function getHandler() {
   const serverless = require('serverless-http');
   const initSqlJs = require('sql.js');
 
-  const wasmFile = path.join(__dirname, 'vendor', 'sql-wasm.wasm');
+  const wasmFile = path.join(__dirname, '_vendor', 'sql-wasm.wasm');
   if (!fs.existsSync(wasmFile)) {
     throw new Error(`Missing wasm at ${wasmFile}`);
   }

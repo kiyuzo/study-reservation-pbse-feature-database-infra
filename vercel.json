@@ -3,6 +3,7 @@
   "installCommand": "npm install",
   "functions": {
     "api/index.js": {
+      "includeFiles": "api/_vendor/**",
       "memory": 1024,
       "maxDuration": 30
     }
