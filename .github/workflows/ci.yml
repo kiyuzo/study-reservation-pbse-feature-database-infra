@@ -2,7 +2,7 @@ name: Contract & CI Conformance Tests
 
 on:
   push:
-    branches: [ main, 'feature/**' ]
+    branches: [ main, p3-fixed, 'feature/**' ]
   pull_request:
     branches: [ main ]
 
@@ -35,9 +35,9 @@ jobs:
       - name: Run Full Test Suite (Unit, Idempotency & Contract)
         run: |
           cd service
-          npm test
+          npm test -- --runInBand
 
       - name: Run Contract Conformance Tests
         run: |
           cd service
-          npm run test:contract
+          npm run test:contract -- --runInBand

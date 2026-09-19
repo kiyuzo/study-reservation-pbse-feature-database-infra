@@ -42,6 +42,7 @@
     "testMatch": [
       "<rootDir>/tests/**/*.test.js"
     ],
+    "maxWorkers": 1,
     "passWithNoTests": true
   }
 }

@@ -2,9 +2,60 @@
 
 This directory contains the backend implementation for the Study Room Reservation System (PBSE Week 3).
 
-## 🚀 Deployed URL
-- **Production URL:** *[To be added after deployment]*
-- **Health Check:** `[Deployment URL]/health`
+## Deployed URL
+
+- **Production URL:** `REPLACE_AFTER_RENDER_DEPLOY` (paste `https://….onrender.com` here after deploy)
+- **Health Check:** `REPLACE_AFTER_RENDER_DEPLOY/health`
+
+> Free Render instances spin down when idle. The first request after sleep can take 30–60s.
+
+---
+
+## Deploy (Render free)
+
+No paid disk. Env vars match [`../render.yaml`](../render.yaml) and [`.env.example`](.env.example): `PORT`, `NODE_ENV`, `BASE_URL`, `DATABASE_PATH`.
+
+1. Push this work on branch **`p3-fixed`** (not `main`).
+2. Sign up at [render.com](https://render.com) with GitHub.
+3. **New → Blueprint** (uses root `render.yaml`) **or** **Web Service** from repo `kiyuzo/study-reservation-pbse-feature-database-infra`, branch **`p3-fixed`**.
+4. Confirm build/start:
+   - Build: `cd service && npm ci && cp .env.example .env && npm run db:init`
+   - Start: `cd service && npm start`
+5. After deploy, copy the public URL into **Production URL** above.
+6. In Render → Environment, set `BASE_URL` to that full URL (including `https://`, no trailing slash) if the auto `host` value is incomplete.
+7. Open `/health` — expect `200` with `"status":"pass"`.
+
+**Ephemeral disk:** runtime writes can disappear after sleep/redeploy. Assignment A.7 (survive process restart) is demonstrated **locally** with the same code (see demo sheet below).
+
+---
+
+## Grader demo cheat sheet
+
+### Live (public URL, keep instance warm)
+
+```bash
+BASE=REPLACE_AFTER_RENDER_DEPLOY   # e.g. https://study-reservation-api.onrender.com
+
+curl -s "$BASE/health"
+curl -s "$BASE/v1/rooms"
+
+KEY=$(uuidgen)   # or any UUID v4
+curl -s -D - -X POST "$BASE/v1/reservations" \
+  -H "Idempotency-Key: $KEY" -H "Content-Type: application/json" \
+  -d '{"roomId":"rm_1a2B3cD","date":"2026-12-15","startTime":"08:00","endTime":"09:00"}'
+# note the returned id, then:
+curl -s "$BASE/v1/reservations/<id>"
+```
+
+### Local restart + idempotency (A.7 / A.8)
+
+```bash
+cd service
+cp .env.example .env
+npm ci && npm run db:init && npm start
+# In another terminal — create, then POST again with the SAME key; expect one row / identical body.
+# Stop the Node process (Ctrl+C), start again with npm start, GET the same id — entity must still exist.
+```
 
 ---
 
