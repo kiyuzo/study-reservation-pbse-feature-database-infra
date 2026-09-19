@@ -1,10 +1,10 @@
 {
   "version": 2,
   "installCommand": "npm install",
-  "buildCommand": "npm rebuild better-sqlite3",
+  "buildCommand": "node -e \"console.log('skip native rebuild; Vercel uses sql.js')\"",
   "functions": {
     "api/index.js": {
-      "includeFiles": "{service/db/**,service/src/views/**,openapi.yaml,openapi.json}",
+      "includeFiles": "{service/db/**,service/src/views/**,openapi.yaml,openapi.json,node_modules/sql.js/dist/**}",
       "memory": 1024,
       "maxDuration": 30
     }

@@ -15,7 +15,7 @@
 // e.g., findAllRooms(filters), findRoomById(id)
 
 const path = require('path');
-const Database = require('better-sqlite3');
+const Database = require('../db/driver');
 
 const configuredPath = process.env.DATABASE_PATH;
 

@@ -23,7 +23,8 @@
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^4.22.2",
-    "js-yaml": "^4.3.2"
+    "js-yaml": "^4.3.2",
+    "sql.js": "^1.14.2"
   },
   "devDependencies": {
     "jest": "^29.7.0",

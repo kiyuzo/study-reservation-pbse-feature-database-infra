@@ -13,7 +13,7 @@ const path = require('path');
 
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const Database = require('better-sqlite3');
+const Database = require('../src/db/driver');
 
 const REQUIRED = ['DATABASE_PATH'];
 const missing = REQUIRED.filter((key) => {

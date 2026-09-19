@@ -30,7 +30,7 @@
 
 const path = require('path');
 const crypto = require('crypto');
-const Database = require('better-sqlite3');
+const Database = require('../db/driver');
 
 /**
  * Returns a configured Database instance.

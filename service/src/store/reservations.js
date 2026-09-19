@@ -17,7 +17,7 @@
 // e.g., createReservation(data), findReservationById(id), checkRoomConflict(roomId, date, startTime, endTime)
 
 const path = require('path');
-const Database = require('better-sqlite3');
+const Database = require('../db/driver');
 
 const configuredPath = process.env.DATABASE_PATH;
 
