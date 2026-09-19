@@ -4,7 +4,7 @@
   "buildCommand": "npm rebuild better-sqlite3",
   "functions": {
     "api/index.js": {
-      "includeFiles": "service/db/**",
+      "includeFiles": "{service/db/**,service/src/views/**,openapi.yaml,openapi.json}",
       "memory": 1024,
       "maxDuration": 30
     }

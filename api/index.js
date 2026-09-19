@@ -4,6 +4,7 @@
  */
 
 const path = require('path');
+const express = require('express');
 
 process.env.VERCEL = process.env.VERCEL || '1';
 process.env.NODE_ENV = process.env.NODE_ENV || 'production';
@@ -16,13 +17,28 @@ process.env.BASE_URL =
     ? `https://${process.env.VERCEL_URL}`
     : 'http://localhost:3000');
 
-// Prefer service/node_modules when installed under service/ (local parity)
 const serviceModules = path.join(__dirname, '..', 'service', 'node_modules');
 if (!module.paths.includes(serviceModules)) {
   module.paths.unshift(serviceModules);
 }
 
-const { ensureDatabase } = require('../service/db/ensure');
-ensureDatabase();
+let app;
+try {
+  const { ensureDatabase } = require('../service/db/ensure');
+  ensureDatabase();
+  app = require('../service/src/app');
+} catch (err) {
+  console.error('[api] Failed to boot Express app:', err);
+  app = express();
+  app.use((req, res) => {
+    res.status(500).json({
+      type: 'https://api.library.example/problems/internal-server-error',
+      title: 'Internal Server Error',
+      status: 500,
+      detail: err && err.message ? err.message : String(err),
+      bootStack: err && err.stack ? String(err.stack).split('\n').slice(0, 8) : []
+    });
+  });
+}
 
-module.exports = require('../service/src/app');
+module.exports = app;

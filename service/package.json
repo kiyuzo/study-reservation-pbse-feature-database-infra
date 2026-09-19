@@ -22,7 +22,8 @@
     "better-sqlite3": "^11.10.0",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
-    "express": "^4.22.2"
+    "express": "^4.22.2",
+    "js-yaml": "^4.3.2"
   },
   "devDependencies": {
     "jest": "^29.7.0",
