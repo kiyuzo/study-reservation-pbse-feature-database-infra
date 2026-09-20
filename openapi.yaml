@@ -15,7 +15,7 @@ openapi: 3.1.0
 
 info:
   title: Library Study Room Reservation API
-  version: 0.1.0
+  version: 0.2.0
   description: |
     A student checks the availability of study rooms in the library on a given date and time. They select an available room and reserve it. An automated cleanup job periodically checks if reserved rooms have been occupied (via check-in); if a student doesn't check in within 15 minutes, the job cancels the reservation. A room display screen outside each room shows the current reservation status and allows students to check in. If a student tries to reserve a room that was just booked by someone else a second ago, the reservation fails.
 
@@ -50,6 +50,10 @@ servers:
   - url: http://localhost:8080/v1
     description: Local development
 
+security:
+  - oauth2:
+      - rooms:read
+      
 tags:
   - name: system
     description: System infrastructure and service health checks.
@@ -65,6 +69,7 @@ paths:
     get:
       operationId: getHealth
       summary: Health
+      security: []
       tags: [system]
       description: |
         Health check endpoint. Always returns 200 without checking external dependencies (Assignment A.10).
@@ -94,9 +99,18 @@ paths:
    get:
     operationId: listRooms
     summary: List study rooms
+    security:
+      - oauth2:
+        - rooms:read
     tags: [Rooms]
     description: Lists all study rooms available in the library.
     responses:
+      '401':
+        $ref: '#/components/responses/Unauthorized'
+      '403':
+        $ref: '#/components/responses/Forbidden'
+      '404':
+        $ref: '#/components/responses/NotFound'
       '200':
         description: A collection of study rooms.
         content:
@@ -121,8 +135,15 @@ paths:
     get:
       operationId: getRoom
       summary: Fetch one study room
+      security:
+      - oauth2:
+          - rooms:read
       tags: [Rooms]
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+         $ref: '#/components/responses/Forbidden'
         '200':
           description: The study room.
           content:
@@ -143,6 +164,9 @@ paths:
     get:
       operationId: listReservations
       summary: List reservations
+      security:
+      - oauth2:
+          - reservations:read
       tags: [Reservations]
       description: |
         Lists the user's reservations. Cancelled and completed reservations appear in the list, so that clients can display them appropriately in history views rather than silently omitting them.
@@ -169,6 +193,12 @@ paths:
           description: Opaque cursor from a previous page's nextCursor.
           schema: { type: string }
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '200':
           description: A page of reservations.
           content:
@@ -194,6 +224,9 @@ paths:
     post:
       operationId: createReservation
       summary: Create a reservation
+      security:
+      - oauth2:
+          - reservations:write
       tags: [Reservations]
       description: |
         Creates a new room reservation. This is the consequential operation that must not happen twice, because it locks the availability of the room.
@@ -216,6 +249,12 @@ paths:
           application/json:
             schema: { $ref: '#/components/schemas/NewReservation' }
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '201':
           description: |
             Created — or, on a retry with the same key and the same
@@ -244,8 +283,15 @@ paths:
     get:
       operationId: getReservation
       summary: Fetch one reservation
+      security:
+      - oauth2:
+          - reservations:read
       tags: [Reservations]
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '200':
           description: The reservation.
           content:
@@ -267,6 +313,9 @@ paths:
     post:
       operationId: cancelReservation
       summary: Cancel a reservation
+      security:
+      - oauth2:
+          - reservations:write
       tags: [Reservations]
       description: |
         Cancels a pending reservation. Note that the transition carries a
@@ -289,6 +338,12 @@ paths:
                   type: string
                   example: Changed my mind
       responses:
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
         '200':
           description: Already cancelled. The existing record is returned.
           content:
@@ -317,6 +372,30 @@ paths:
 
 components:
 
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      flows:
+        authorizationCode:
+          authorizationUrl: http://localhost:8080/realms/study-reservation/protocol/openid-connect/auth
+          tokenUrl: http://localhost:8080/realms/study-reservation/protocol/openid-connect/token
+          refreshUrl: http://localhost:8080/realms/study-reservation/protocol/openid-connect/token
+          scopes:
+            rooms:read: Browse rooms and room details
+            reservations:read: Read reservations visible to the principal
+            reservations:write: Create and cancel own reservations
+            rooms:display: Sync schedule / status for an assigned room
+            reservations:checkin: Check a reservation in at a room
+            reservations:cleanup: Mark abandoned reservations
+
+    clientCredentials:
+      type: oauth2
+      flows:
+        clientCredentials:
+          tokenUrl: http://localhost:8080/realms/study-reservation/protocol/openid-connect/token
+          scopes:
+            reservations:cleanup: Mark abandoned reservations
+            
   schemas:
     Room:
       type: object
@@ -465,6 +544,32 @@ components:
             type: https://api.library.example/problems/malformed-request
             title: The request could not be parsed
             status: 400
+        
+    Unauthorized:
+      description: Access token is missing or invalid.
+      headers:
+        WWW-Authenticate:
+          description: Bearer authentication challenge.
+          schema:
+            type: string
+          example: 'Bearer error="invalid_token"'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+
+    Forbidden:
+      description: Access token does not have the required scope.
+      headers:
+        WWW-Authenticate:
+          description: Bearer insufficient-scope challenge.
+          schema:
+            type: string
+          example: 'Bearer error="insufficient_scope", scope="reservations:write"'
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
 
     NotFound:
       description: No such resource — or none you may see.
