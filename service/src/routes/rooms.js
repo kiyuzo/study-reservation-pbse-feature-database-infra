@@ -18,6 +18,7 @@
  */
 
 const express = require('express');
+const { requireScope } = require('../auth/require-scope');
 
 const {
   validateRoomId,
@@ -36,7 +37,7 @@ const {
 const router = express.Router();
 
 // GET /v1/rooms
-router.get('/', (req, res, next) => {
+router.get('/', requireScope('rooms:read'), (req, res, next) => {
   try {
     validateListRoomsQuery(req.query);
 
@@ -51,7 +52,7 @@ router.get('/', (req, res, next) => {
 });
 
 // GET /v1/rooms/:roomId
-router.get('/:roomId', (req, res, next) => {
+router.get('/:roomId', requireScope('rooms:read'), (req, res, next) => {
   try {
     const roomId = validateRoomId(req.params.roomId);
 

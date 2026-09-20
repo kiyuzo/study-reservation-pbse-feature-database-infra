@@ -25,6 +25,8 @@ const PROBLEM_TYPES = {
   ILLEGAL_TRANSITION: 'https://api.library.example/problems/illegal-transition',
   ROOM_UNAVAILABLE: 'https://api.library.example/problems/room-unavailable',
   VALIDATION_FAILED: 'https://api.library.example/problems/validation-failed',
+  UNAUTHORIZED: 'https://api.library.example/problems/unauthorized',
+  FORBIDDEN: 'https://api.library.example/problems/forbidden',
   INTERNAL_SERVER_ERROR: 'https://api.library.example/problems/internal-server-error'
 };
 
@@ -36,6 +38,8 @@ const DEFAULT_TITLES = {
   [PROBLEM_TYPES.ILLEGAL_TRANSITION]: 'That status change is not permitted',
   [PROBLEM_TYPES.ROOM_UNAVAILABLE]: 'The room is already reserved for the requested time',
   [PROBLEM_TYPES.VALIDATION_FAILED]: 'One or more fields are invalid',
+  [PROBLEM_TYPES.UNAUTHORIZED]: 'Authentication is required',
+  [PROBLEM_TYPES.FORBIDDEN]: 'Insufficient permissions',
   [PROBLEM_TYPES.INTERNAL_SERVER_ERROR]: 'Internal Server Error'
 };
 
@@ -192,11 +196,42 @@ function problemHandler(err, req, res, next) {
   });
 }
 
+function unauthorized(res) {
+  res.set('WWW-Authenticate', 'Bearer error="invalid_token"');
+
+  return sendProblem(res, {
+    status: 401,
+    type: PROBLEM_TYPES.UNAUTHORIZED,
+    title: 'Authentication is required',
+    detail: 'A valid Bearer access token is required.'
+  });
+}
+
+function forbidden(res, requiredScope) {
+  const scope = requiredScope
+    ? `, scope="${requiredScope}"`
+    : '';
+
+  res.set(
+    'WWW-Authenticate',
+    `Bearer error="insufficient_scope"${scope}`
+  );
+
+  return sendProblem(res, {
+    status: 403,
+    type: PROBLEM_TYPES.FORBIDDEN,
+    title: 'Insufficient permissions',
+    detail: 'The access token does not have the required scope.'
+  });
+}
+
 module.exports = {
   problem,
   sendProblem,
   notFoundHandler,
   problemHandler,
+  unauthorized,
+  forbidden,
   PROBLEM_TYPES,
   DEFAULT_TITLES
 };

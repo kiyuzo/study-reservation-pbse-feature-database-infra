@@ -21,7 +21,15 @@ const cors = require('cors');
 // Load .env from service/ regardless of process cwd
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
 
-const REQUIRED_ENV = ['PORT', 'NODE_ENV', 'BASE_URL', 'DATABASE_PATH'];
+const REQUIRED_ENV = [
+  'PORT',
+  'NODE_ENV',
+  'BASE_URL',
+  'DATABASE_PATH',
+  'OIDC_ISSUER',
+  'OIDC_JWKS_URI',
+  'OIDC_AUDIENCE'
+];
 
 function assertRequiredConfig() {
   const missing = REQUIRED_ENV.filter((key) => {
@@ -73,6 +81,9 @@ app.locals.config = {
 
 app.use(cors());
 app.use(express.json());
+
+const { authenticate } = require('./auth/authenticate');
+app.use(authenticate);
 
 // ----------------------------------------------------------------------------
 // Health Check — 200 only; must NOT check the database (assignment A.10)
