@@ -37,7 +37,7 @@ jobs:
           cd service
           npm test -- --runInBand
 
-      - name: Run Contract Conformance Tests
+      - name: Run Authorization Tests
         run: |
           cd service
-          npm run test:contract -- --runInBand
+          npm run test:auth

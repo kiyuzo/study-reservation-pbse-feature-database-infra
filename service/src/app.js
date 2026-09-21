@@ -20,8 +20,38 @@ const cors = require('cors');
 
 // Load .env from service/ regardless of process cwd
 require('dotenv').config({ path: path.join(__dirname, '..', '.env') });
+// Safe defaults for tests
+if (process.env.NODE_ENV === 'test') {
+  process.env.PORT = process.env.PORT || '8080';
 
-const REQUIRED_ENV = ['PORT', 'NODE_ENV', 'BASE_URL', 'DATABASE_PATH'];
+  process.env.BASE_URL =
+    process.env.BASE_URL || 'http://localhost:8080';
+
+  process.env.DATABASE_PATH =
+    process.env.DATABASE_PATH ||
+    path.resolve(__dirname, '../db/reservation.sqlite');
+
+  process.env.OIDC_ISSUER =
+    process.env.OIDC_ISSUER ||
+    'http://localhost:8080/realms/study-reservation';
+
+  process.env.OIDC_JWKS_URI =
+    process.env.OIDC_JWKS_URI ||
+    'http://localhost:8080/realms/study-reservation/protocol/openid-connect/certs';
+
+  process.env.OIDC_AUDIENCE =
+    process.env.OIDC_AUDIENCE || 'study-reservation-api';
+}
+
+const REQUIRED_ENV = [
+  'PORT',
+  'NODE_ENV',
+  'BASE_URL',
+  'DATABASE_PATH',
+  'OIDC_ISSUER',
+  'OIDC_JWKS_URI',
+  'OIDC_AUDIENCE'
+];
 
 function assertRequiredConfig() {
   const missing = REQUIRED_ENV.filter((key) => {
@@ -71,8 +101,19 @@ app.locals.config = {
   databasePath: DATABASE_PATH
 };
 
-app.use(cors());
+// Request ID — must run before authentication/logging
+const { requestIdMiddleware } = require('./middleware/request-id');
+app.use(requestIdMiddleware);
+
+app.use(cors({
+  exposedHeaders: ['X-Request-ID', 'Location', 'WWW-Authenticate']
+}));
+
 app.use(express.json());
+
+// Authentication middleware
+const { authenticate } = require('./auth/authenticate');
+app.use(authenticate);
 
 // ----------------------------------------------------------------------------
 // Health Check — 200 only; must NOT check the database (assignment A.10)

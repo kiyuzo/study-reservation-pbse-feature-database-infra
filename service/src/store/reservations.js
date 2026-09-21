@@ -28,6 +28,20 @@ const db = new Database(dbPath);
 
 db.pragma('foreign_keys = ON');
 
+// Ensure ownership table exists without changing the frozen base schema.
+db.exec(`
+  CREATE TABLE IF NOT EXISTS reservation_owners (
+    reservation_id TEXT PRIMARY KEY,
+    owner_subject TEXT NOT NULL,
+    FOREIGN KEY (reservation_id)
+      REFERENCES reservations(id)
+      ON DELETE CASCADE
+  );
+
+  CREATE INDEX IF NOT EXISTS idx_reservation_owners_subject
+    ON reservation_owners (owner_subject);
+`);
+
 // -----------------------------------------------------------------------------
 // Find reservation by ID
 // -----------------------------------------------------------------------------
@@ -36,18 +50,21 @@ function findReservationById(id) {
   return db
     .prepare(`
       SELECT
-        id,
-        room_id,
-        date,
-        start_time,
-        end_time,
-        status,
-        created_at,
-        cancel_reason,
-        cancelled_at,
-        checked_in_at
-      FROM reservations
-      WHERE id = ?
+        r.id,
+        r.room_id,
+        r.date,
+        r.start_time,
+        r.end_time,
+        r.status,
+        r.created_at,
+        r.cancel_reason,
+        r.cancelled_at,
+        r.checked_in_at,
+        o.owner_subject AS ownerSubject
+      FROM reservations r
+      LEFT JOIN reservation_owners o
+        ON r.id = o.reservation_id
+      WHERE r.id = ?
     `)
     .get(id);
 }
@@ -131,6 +148,7 @@ function findConflictingReservation(roomId, date, startTime, endTime) {
     );
 }
 
+
 function createReservation({
   id,
   roomId,
@@ -138,31 +156,43 @@ function createReservation({
   startTime,
   endTime,
   status,
-  createdAt
+  createdAt,
+  ownerSubject
 }) {
-  db
-    .prepare(`
-      INSERT INTO reservations (
-        id,
-        room_id,
-        date,
-        start_time,
-        end_time,
-        status,
-        created_at
-      )
-      VALUES (?, ?, ?, ?, ?, ?, ?)
-    `)
-    .run(
+  // 1. Insert the reservation.
+  db.prepare(`
+    INSERT INTO reservations (
       id,
-      roomId,
+      room_id,
       date,
-      startTime,
-      endTime,
+      start_time,
+      end_time,
       status,
-      createdAt
-    );
+      created_at
+    )
+    VALUES (?, ?, ?, ?, ?, ?, ?)
+  `).run(
+    id,
+    roomId,
+    date,
+    startTime,
+    endTime,
+    status,
+    createdAt
+  );
 
+  // 2. Store the reservation owner separately.
+  if (ownerSubject) {
+    db.prepare(`
+      INSERT INTO reservation_owners (
+        reservation_id,
+        owner_subject
+      )
+      VALUES (?, ?)
+    `).run(id, ownerSubject);
+  }
+
+  // 3. Return the created reservation.
   return findReservationById(id);
 }
 
@@ -194,6 +224,20 @@ function cancelReservation(id, cancelReason = null) {
   return findReservationById(id);
 }
 
+
+function checkInReservation(id) {
+  const checkedInAt = new Date().toISOString();
+
+  db.prepare(`
+    UPDATE reservations
+    SET status = 'checked_in',
+        checked_in_at = ?
+    WHERE id = ?
+  `).run(checkedInAt, id);
+
+  return findReservationById(id);
+}
+
 module.exports = {
   findReservationById,
   findAllReservations,
@@ -202,5 +246,6 @@ module.exports = {
   createReservation,
   findIdempotencyKey,
   saveIdempotencyKey,
-  cancelReservation
+  cancelReservation,
+  checkInReservation
 };

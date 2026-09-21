@@ -4,12 +4,13 @@
   "description": "Backend service for Study Room Reservation System (PBSE Week 3)",
   "main": "src/app.js",
   "scripts": {
-    "start": "node src/app.js",
-    "dev": "nodemon src/app.js",
-    "db:init": "node db/init.js",
-    "test": "jest",
-    "test:contract": "jest tests/contract"
-  },
+  "start": "node src/app.js",
+  "dev": "nodemon src/app.js",
+  "db:init": "node db/init.js",
+  "test": "jest",
+  "test:contract": "jest tests/contract",
+  "test:auth": "jest tests/security --runInBand"
+},
   "keywords": [
     "pbse",
     "contract-first",
@@ -23,6 +24,7 @@
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^4.22.2",
+    "jose": "^6.2.12",
     "js-yaml": "^4.3.2",
     "sql.js": "^1.14.2"
   },

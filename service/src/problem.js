@@ -192,11 +192,40 @@ function problemHandler(err, req, res, next) {
   });
 }
 
+function unauthorized(res) {
+  res.set('WWW-Authenticate', 'Bearer error="invalid_token"');
+
+  return sendProblem(res, {
+    status: 401,
+    type: 'https://api.library.example/problems/unauthorized',
+    title: 'Authentication is required',
+    detail: 'A valid Bearer token is required.'
+  });
+}
+
+function forbidden(res, requiredScope) {
+  res.set(
+    'WWW-Authenticate',
+    `Bearer error="insufficient_scope"${requiredScope ? `, scope="${requiredScope}"` : ''}`
+  );
+
+  return sendProblem(res, {
+    status: 403,
+    type: 'https://api.library.example/problems/forbidden',
+    title: 'Insufficient permissions',
+    detail: requiredScope
+      ? `Required scope: ${requiredScope}`
+      : 'You are not authorized to perform this action.'
+  });
+}
+
 module.exports = {
   problem,
   sendProblem,
   notFoundHandler,
   problemHandler,
   PROBLEM_TYPES,
-  DEFAULT_TITLES
+  DEFAULT_TITLES,
+  unauthorized,
+  forbidden
 };
