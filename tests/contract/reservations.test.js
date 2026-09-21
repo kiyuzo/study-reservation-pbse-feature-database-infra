@@ -29,6 +29,18 @@ const path = require('path');
 const crypto = require('crypto');
 const Database = require('better-sqlite3');
 const request = require('supertest');
+const { mintToken } = require('../../service/src/auth/tokens');
+const authToken = mintToken({
+  subject: 'student-a',
+  scopes: [
+    'rooms:read',
+    'reservations:read',
+    'reservations:create',
+    'reservations:cancel',
+    'reservations:checkin',
+    'reservations:write'
+  ]
+});
 
 process.env.NODE_ENV = 'test';
 process.env.PORT = '8080';
@@ -49,13 +61,25 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
     db = new Database(testDbPath);
   });
 
-  beforeEach(() => {
-    // Keep test runs isolated
-    db.exec(`
-      DELETE FROM reservations WHERE date >= '2026-11-01';
-      DELETE FROM idempotency_keys;
-    `);
-  });
+ beforeEach(() => {
+  db.exec(`
+    DELETE FROM reservations WHERE date >= '2026-11-01';
+    DELETE FROM idempotency_keys;
+
+    UPDATE reservations
+    SET status = 'pending_checkin',
+        cancel_reason = NULL,
+        cancelled_at = NULL,
+        checked_in_at = NULL
+    WHERE id IN ('rsv_9X8y7Z', 'rsv_Aa1Bb2', 'rsv_Cc3Dd4');
+
+    INSERT OR IGNORE INTO reservation_owners
+      (reservation_id, owner_subject)
+    SELECT id, 'student-a'
+    FROM reservations
+    WHERE id IN ('rsv_9X8y7Z', 'rsv_Aa1Bb2', 'rsv_Cc3Dd4');
+  `);
+ });
 
   afterAll(() => {
     if (db) {
@@ -81,7 +105,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
       };
 
       const res = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', idempotencyKey)
         .send(payload);
 
@@ -102,7 +126,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
     it('returns 400 Problem Details when Idempotency-Key header is absent', async () => {
       const res = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .send({
           roomId: 'rm_1a2B3cD',
           date: '2026-11-10',
@@ -124,7 +148,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
     it('returns 400 Problem Details when Idempotency-Key header is malformed', async () => {
       const res = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', 'invalid-non-uuid-key')
         .send({
           roomId: 'rm_1a2B3cD',
@@ -140,7 +164,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
     it('returns 400 Problem Details when request body is missing required fields', async () => {
       const res = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', generateUuidV4())
         .send({
           roomId: 'rm_1a2B3cD'
@@ -159,7 +183,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
     it('returns 400 Problem Details when date or time format is malformed', async () => {
       const res = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', generateUuidV4())
         .send({
           roomId: 'rm_1a2B3cD',
@@ -175,7 +199,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
     it('returns 422 Problem Details when time range is semantically invalid (endTime <= startTime)', async () => {
       const res = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', generateUuidV4())
         .send({
           roomId: 'rm_1a2B3cD',
@@ -198,7 +222,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
     it('returns 422 Problem Details when specified roomId does not exist', async () => {
       const res = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', generateUuidV4())
         .send({
           roomId: 'rm_nonexistent999',
@@ -222,14 +246,14 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
       // 1st booking
       const res1 = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', generateUuidV4())
         .send(slot);
       expect(res1.statusCode).toBe(201);
 
       // Overlapping booking for same room and slot
       const res2 = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', generateUuidV4())
         .send({
           roomId: 'rm_1a2B3cD',
@@ -255,7 +279,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
   // ---------------------------------------------------------------------------
   describe('GET /v1/reservations', () => {
     it('returns 200 with list conforming to openapi.yaml', async () => {
-      const res = await request(app).get('/v1/reservations');
+      const res = await request(app).get('/v1/reservations').set('Authorization', `Bearer ${authToken}`);
 
       expect(res.statusCode).toBe(200);
       expect(res.headers['content-type']).toMatch(/application\/json/);
@@ -275,7 +299,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
     });
 
     it('filters reservations by status', async () => {
-      const res = await request(app).get('/v1/reservations?status=checked_in');
+      const res = await request(app).get('/v1/reservations?status=checked_in').set('Authorization', `Bearer ${authToken}`);
 
       expect(res.statusCode).toBe(200);
       expect(Array.isArray(res.body.items)).toBe(true);
@@ -285,7 +309,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
     });
 
     it('returns 400 Problem Details for invalid status query filter', async () => {
-      const res = await request(app).get('/v1/reservations?status=invalid_status_value');
+      const res = await request(app).get('/v1/reservations?status=invalid_status_value').set('Authorization', `Bearer ${authToken}`);
 
       expect(res.statusCode).toBe(400);
       expect(res.headers['content-type']).toMatch(/application\/problem\+json/);
@@ -298,7 +322,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
   // ---------------------------------------------------------------------------
   describe('GET /v1/reservations/:reservationId', () => {
     it('returns 200 with single reservation matching schema', async () => {
-      const res = await request(app).get('/v1/reservations/rsv_9X8y7Z');
+      const res = await request(app).get('/v1/reservations/rsv_9X8y7Z').set('Authorization', `Bearer ${authToken}`);
 
       expect(res.statusCode).toBe(200);
       expect(res.headers['content-type']).toMatch(/application\/json/);
@@ -313,7 +337,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
     });
 
     it('returns 400 Problem Details for malformed reservation ID', async () => {
-      const res = await request(app).get('/v1/reservations/bad_id!');
+      const res = await request(app).get('/v1/reservations/bad_id!').set('Authorization', `Bearer ${authToken}`);
 
       expect(res.statusCode).toBe(400);
       expect(res.headers['content-type']).toMatch(/application\/problem\+json/);
@@ -327,7 +351,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
     });
 
     it('returns 404 Problem Details for non-existent reservation ID', async () => {
-      const res = await request(app).get('/v1/reservations/rsv_9999999');
+      const res = await request(app).get('/v1/reservations/rsv_9999999').set('Authorization', `Bearer ${authToken}`);
 
       expect(res.statusCode).toBe(404);
       expect(res.headers['content-type']).toMatch(/application\/problem\+json/);
@@ -348,7 +372,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
     it('cancels pending reservation and returns 201 with Cancellation schema', async () => {
       // First create a pending reservation to cancel
       const createRes = await request(app)
-        .post('/v1/reservations')
+        .post('/v1/reservations').set('Authorization', `Bearer ${authToken}`)
         .set('Idempotency-Key', generateUuidV4())
         .send({
           roomId: 'rm_1a2B3cD',
@@ -361,7 +385,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
       // Cancel it
       const cancelRes = await request(app)
-        .post(`/v1/reservations/${targetId}/cancellation`)
+        .post(`/v1/reservations/${targetId}/cancellation`).set('Authorization', `Bearer ${authToken}`)
         .send({ reason: 'Schedule conflict' });
 
       expect(cancelRes.statusCode).toBe(201);
@@ -377,8 +401,22 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
     it('returns 200 OK when re-cancelling an already cancelled reservation (idempotent)', async () => {
       // rsv_Cc3Dd4 is seeded as 'cancelled'
+     db.prepare(`
+       UPDATE reservations
+       SET status = 'cancelled',
+           cancel_reason = 'Previously cancelled',
+           cancelled_at = COALESCE(cancelled_at, datetime('now'))
+       WHERE id = ?
+      `).run('rsv_Cc3Dd4');
+
+     db.prepare(`
+       INSERT OR REPLACE INTO reservation_owners
+         (reservation_id, owner_subject)
+       VALUES (?, ?)
+     `).run('rsv_Cc3Dd4', 'student-a');
+
       const res = await request(app)
-        .post('/v1/reservations/rsv_Cc3Dd4/cancellation')
+        .post('/v1/reservations/rsv_Cc3Dd4/cancellation').set('Authorization', `Bearer ${authToken}`)
         .send({ reason: 'Second cancellation attempt' });
 
       expect(res.statusCode).toBe(200);
@@ -393,8 +431,21 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
     it('returns 409 Conflict with illegal-transition Problem Details when status is not pending_checkin', async () => {
       // rsv_Aa1Bb2 is seeded as 'checked_in'
+      db.prepare(`
+        UPDATE reservations
+        SET status = 'checked_in',
+            checked_in_at = COALESCE(checked_in_at, datetime('now'))
+        WHERE id = ?
+      `).run('rsv_Aa1Bb2');
+
+      db.prepare(`
+        INSERT OR REPLACE INTO reservation_owners
+          (reservation_id, owner_subject)
+        VALUES (?, ?)
+      `).run('rsv_Aa1Bb2', 'student-a');
+
       const res = await request(app)
-        .post('/v1/reservations/rsv_Aa1Bb2/cancellation')
+        .post('/v1/reservations/rsv_Aa1Bb2/cancellation').set('Authorization', `Bearer ${authToken}`)
         .send({ reason: 'Attempt to cancel checked in' });
 
       expect(res.statusCode).toBe(409);
@@ -413,7 +464,7 @@ describe('Reservations Contract Tests (openapi.yaml)', () => {
 
     it('returns 404 Problem Details when cancelling non-existent reservation', async () => {
       const res = await request(app)
-        .post('/v1/reservations/rsv_nonexistent999/cancellation')
+        .post('/v1/reservations/rsv_nonexistent999/cancellation').set('Authorization', `Bearer ${authToken}`)
         .send({ reason: 'Invalid reservation' });
 
       expect(res.statusCode).toBe(404);

@@ -7,6 +7,12 @@
 
 const crypto = require('crypto');
 const request = require('supertest');
+const Database = require('better-sqlite3');
+const path = require('path');
+
+const db = new Database(
+  path.resolve(__dirname, '../../service/db/reservation.sqlite')
+);
 
 const app = require('../../service/src/app');
 const { mintToken } = require('../../service/src/auth/tokens');
@@ -63,9 +69,38 @@ describe('Security Layer 1, 2, 3 & Logging Verification (Step 7–9)', () => {
     });
   });
 
-  beforeEach(() => {
-    clearSecurityEvents();
-  });
+ beforeEach(() => {
+  clearSecurityEvents();
+
+  const Database = require('better-sqlite3');
+  const path = require('path');
+  const db = new Database(
+    path.resolve(__dirname, '../../service/db/reservation.sqlite')
+  );
+
+  db.exec(`
+    UPDATE reservations
+    SET status = 'pending_checkin',
+        cancel_reason = NULL,
+        cancelled_at = NULL,
+        checked_in_at = NULL
+    WHERE id IN ('rsv_9X8y7Z', 'rsv_Aa1Bb2', 'rsv_Cc3Dd4');
+  `);
+
+  db.prepare(`
+    INSERT OR REPLACE INTO reservation_owners
+      (reservation_id, owner_subject)
+    VALUES (?, ?)
+  `).run('rsv_9X8y7Z', 'student-a');
+
+  db.prepare(`
+    INSERT OR REPLACE INTO reservation_owners
+      (reservation_id, owner_subject)
+    VALUES (?, ?)
+  `).run('rsv_Aa1Bb2', 'student-b');
+
+  db.close();
+ });
 
   // ---------------------------------------------------------------------------
   // 1. LAYER 1: AUTHENTICATION

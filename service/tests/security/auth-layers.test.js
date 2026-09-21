@@ -8,12 +8,12 @@
 const crypto = require('crypto');
 const request = require('supertest');
 
-const app = require('../../service/src/app');
-const { mintToken } = require('../../service/src/auth/tokens');
+const app = require('../../src/app');
+const { mintToken } = require('../../src/auth/tokens');
 const {
   getRecentSecurityEvents,
   clearSecurityEvents
-} = require('../../service/src/security/audit-logger');
+} = require('../../src/security/audit-logger');
 
 describe('Security Layer 1, 2, 3 & Logging Verification (Step 7–9)', () => {
   let studentAToken;
@@ -65,6 +65,26 @@ describe('Security Layer 1, 2, 3 & Logging Verification (Step 7–9)', () => {
 
   beforeEach(() => {
     clearSecurityEvents();
+
+    const Database = require('better-sqlite3');
+    const path = require('path');
+    const db = new Database(
+      path.resolve(__dirname, '../../db/reservation.sqlite')
+    );
+
+    db.prepare(`
+      INSERT OR REPLACE INTO reservation_owners
+        (reservation_id, owner_subject)
+      VALUES (?, ?)
+    `).run('rsv_9X8y7Z', 'student-a');
+
+    db.prepare(`
+      INSERT OR REPLACE INTO reservation_owners
+        (reservation_id, owner_subject)
+      VALUES (?, ?)
+    `).run('rsv_Aa1Bb2', 'student-b');
+
+    db.close();
   });
 
   // ---------------------------------------------------------------------------
