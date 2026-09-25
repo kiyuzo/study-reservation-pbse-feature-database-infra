@@ -1,6 +1,7 @@
 /**
  * Ensure SQLite exists. On Vercel, prefer schema/seed under api/.
- * For :memory:, always seed into the live sql.js singleton (do not close it).
+ * For :memory:, apply schema into the live sql.js singleton (do not close it)
+ * and seed only when the database is empty (idempotent across boot retries).
  */
 
 const fs = require('fs');
@@ -38,18 +39,27 @@ function readSqlFiles() {
   throw new Error('schema.sql / seed.sql not found next to function or in service/db');
 }
 
+function countRooms(db) {
+  const row = db.prepare('SELECT COUNT(*) AS n FROM rooms').get();
+  return row && typeof row.n === 'number' ? row.n : Number(row && row.n) || 0;
+}
+
 function ensureDatabase() {
   const configuredPath = process.env.DATABASE_PATH || './db/reservation.sqlite';
   const dbPath = resolveDbPath(configuredPath);
   const { schemaSql, seedSql } = readSqlFiles();
 
-  // :memory: — always (re)apply into the shared singleton; never close it
+  // :memory: — shared sql.js singleton; schema is IF NOT EXISTS; seed only if empty
   if (dbPath === ':memory:') {
     const db = new Database(dbPath);
     db.pragma('foreign_keys = ON');
     db.exec(schemaSql);
-    db.exec(seedSql);
-    console.log('[db:ensure] Seeded in-memory database for Vercel');
+    if (countRooms(db) === 0) {
+      db.exec(seedSql);
+      console.log('[db:ensure] Seeded in-memory database for Vercel');
+    } else {
+      console.log('[db:ensure] In-memory database already seeded; skipping seed');
+    }
     return dbPath;
   }
 
