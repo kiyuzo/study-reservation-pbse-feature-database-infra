@@ -1,77 +1,112 @@
 # Service Implementation — Study Room Reservation API
 
-This directory contains the backend implementation for the Study Room Reservation System (PBSE Week 3).
+This directory contains the backend implementation for the Study Room Reservation System (PBSE Week 3–4).
 
-## Deployed URL
+## Deployed URL (use this only)
 
 - **Production URL:** https://study-reservation-pbse-feature-data.vercel.app
 - **Health Check:** https://study-reservation-pbse-feature-data.vercel.app/health
 
-Verified on Production (`bbada02`): `/health`, `GET /v1/rooms`, create reservation, get by id, and idempotent replay.
+**Do not** use Preview deployment URLs (e.g. `*-lq2smimvx.vercel.app`). Those often redirect to **Vercel SSO (302 HTML)** and are unusable for API clients / Assignment 5.
 
-> Cold starts can take a few seconds. SQLite on Vercel is in-memory per isolate; prove A.7 process-restart locally.
+> Cold starts can take a few seconds. SQLite on Vercel is **in-memory per isolate** (`api/index.js` forces `:memory:`); prove process-restart persistence locally with `npm run db:init` + file DB.
+
+### Teammate paste (Assignment 5)
+
+```
+API base (Production only):
+https://study-reservation-pbse-feature-data.vercel.app
+
+- GET /health → 200 JSON (no auth)
+- GET /v1/rooms without Authorization → 401 Problem Details (Session 4; rooms:read required)
+- Do NOT use Preview URLs (Vercel login HTML)
+- Send Authorization: Bearer <token> with scopes matching routes
+  (rooms:read, reservations:read, reservations:create, reservations:cancel, reservations:checkin)
+```
 
 ---
 
 ## Deploy (Vercel free / Hobby)
 
-Branch: **`p3-fixed`** (not `main`). Node.js **20.x**.
+Production branch: **`main`**. Node.js **20.x**.
 
 ### One-time project settings (required)
 
 1. Vercel → Project → **Settings → General → Node.js Version** → **20.x**
-2. **Settings → Git → Production Branch** → set to **`p3-fixed`** (or keep `main` and use Promote below)
-3. **Settings → Deployment Protection** → turn **off** Vercel Authentication for Production  
-   (Preview SSO returns HTML login pages instead of the API — graders cannot use a protected Preview URL)
-
-### Promote latest fix to Production
-
-1. Vercel → **Deployments**
-2. Open the latest deployment from branch **`p3-fixed`** (commit message about Vercel/sql.js/`_vendor`)
-3. **⋯ → Promote to Production**
-4. Wait until Production is Ready
-5. Test: `https://study-reservation-pbse-feature-data.vercel.app/health`  
-   Expect JSON: `{"status":"pass",...}` — **not** HTML and **not** `FUNCTION_INVOCATION_FAILED`
+2. **Settings → Git → Production Branch** → **`main`**
+3. **Settings → Deployment Protection** → turn **off** Vercel Authentication for **Production**  
+   (Preview may stay protected. Preview SSO returns HTML login instead of the API.)
 
 ### Env vars (Production)
 
-- `NODE_ENV` = `production`
-- `PORT` = `3000`
-- `DATABASE_PATH` = `/tmp/reservation.sqlite`
-- `BASE_URL` = `https://study-reservation-pbse-feature-data.vercel.app`
+Set under **Settings → Environment Variables** (scope: Production), then **Redeploy**:
 
-### How it works
+| Name | Value |
+| :--- | :--- |
+| `NODE_ENV` | `production` |
+| `PORT` | `3000` |
+| `DATABASE_PATH` | `/tmp/reservation.sqlite` (documented; runtime still uses `:memory:` on Vercel) |
+| `BASE_URL` | `https://study-reservation-pbse-feature-data.vercel.app` |
+| `OIDC_ISSUER` | `http://localhost:8080/realms/study-reservation` |
+| `OIDC_JWKS_URI` | `http://localhost:8080/realms/study-reservation/protocol/openid-connect/certs` |
+| `OIDC_AUDIENCE` | `study-reservation-api` |
+| `DEV_AUTH_SECRET` | same as local lab secret (optional for 401 smoke; needed to verify HS256 lab tokens) |
 
-- `api/index.js` boots **sql.js** (WASM under `api/_vendor/`, not a native addon)
-- `serverless-http` adapts Express
-- SQLite file is created under `/tmp` on cold start from `api/schema.sql` + `api/seed.sql`
-- A.7 restart demo is still done **locally** (Vercel `/tmp` is ephemeral)
+`OIDC_*` must be **non-empty** or Express boot fails with 500. Localhost issuer strings are **boot placeholders** (iss/aud string checks). They are **not** a reachable IdP from Vercel. Real RS256 Keycloak tokens need a public IdP later. Unauthenticated protected routes still return **401** once boot succeeds.
+
+### After env or code change
+
+1. Push / merge to **`main`**, or Vercel → **Deployments** → Redeploy Production
+2. Wait until Production is Ready
+3. Smoke (PowerShell — use `curl.exe`, not PowerShell `curl` alias):
+
+```powershell
+$BASE = "https://study-reservation-pbse-feature-data.vercel.app"
+
+curl.exe -sS "$BASE/health"
+# expect 200 JSON: {"status":"pass",...}
+
+curl.exe -sS -D - -o - "$BASE/v1/rooms"
+# expect 401 application/problem+json — NOT 500, NOT 302 HTML login
+```
 
 ---
 
-## Grader demo cheat sheet
+## How Vercel boot works
 
-### Live (public Production URL)
+- `api/index.js` boots **sql.js** (WASM under `api/_vendor/`)
+- On first non-health request: `ensureDatabase()` then loads Express
+- `:memory:` seed is **idempotent** (seed only if `rooms` is empty) so a failed boot retry does not hit `UNIQUE constraint failed: rooms.id`
+- `/health` responds without loading Express (so it works even if OIDC env is missing)
 
-```bash
-BASE=https://study-reservation-pbse-feature-data.vercel.app
+---
 
-curl -s "$BASE/health"
-curl -s "$BASE/v1/rooms"
+## Grader / smoke cheat sheet
 
-KEY=$(uuidgen)
-curl -s -D - -X POST "$BASE/v1/reservations" \
-  -H "Idempotency-Key: $KEY" -H "Content-Type: application/json" \
-  -d '{"roomId":"rm_1a2B3cD","date":"2026-12-15","startTime":"08:00","endTime":"09:00"}'
+### Live (public Production URL) — PowerShell
+
+```powershell
+$BASE = "https://study-reservation-pbse-feature-data.vercel.app"
+
+curl.exe -sS "$BASE/health"
+# 200 JSON
+
+curl.exe -sS -D - -o - "$BASE/v1/rooms"
+# 401 without Bearer (Session 4 requires rooms:read)
+
+# With a valid Bearer + rooms:read scope → 200 + room array
+# curl.exe -sS -H "Authorization: Bearer <token>" "$BASE/v1/rooms"
 ```
 
 ### Local restart + idempotency (A.7 / A.8)
 
-```bash
+```powershell
 cd service
-cp .env.example .env
-npm ci && npm run db:init && npm start
-# create → POST again with SAME key → one row
+Copy-Item .env.example .env
+npm ci
+npm run db:init
+npm start
+# create → POST again with SAME Idempotency-Key → one row
 # Ctrl+C → npm start → GET same id still exists
 ```
 
