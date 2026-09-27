@@ -152,6 +152,9 @@ app.use('/v1/rooms', roomsRouter);
 const reservationsRouter = require('./routes/reservations');
 app.use('/v1/reservations', reservationsRouter);
 
+const securityRouter = require('./routes/security');
+app.use('/v1/security', securityRouter);
+
 // ----------------------------------------------------------------------------
 // RFC 9457 Problem Details Handlers (Person 4 problem.js)
 // ----------------------------------------------------------------------------

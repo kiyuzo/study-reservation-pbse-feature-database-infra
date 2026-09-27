@@ -20,6 +20,7 @@
 
 const express = require('express');
 const crypto = require('crypto');
+const { logSecurityEvent } = require('../security/audit-logger');
 
 const { requireScope } = require('../auth/require-scope');
 
@@ -82,6 +83,7 @@ router.post(
         const error = new Error(
           'A valid Idempotency-Key header is required.'
         );
+
         error.status = 400;
         throw error;
       }
@@ -132,10 +134,12 @@ router.post(
 
       if (!room) {
         const error = new Error('Room not found.');
+
         error.status = 422;
         error.fields = {
           roomId: 'The specified room does not exist.'
         };
+
         throw error;
       }
 
@@ -195,7 +199,24 @@ router.post(
         expiresAt
       });
 
-      // 8. Return created reservation.
+      // 8. Write security audit event.
+      logSecurityEvent({
+        event: 'reservation.create',
+        actorId: req.principal.subject,
+        method: req.method,
+        path: req.originalUrl,
+        resourceId: id,
+        result: 'success',
+        requestId: req.id,
+        metadata: {
+          roomId,
+          date,
+          startTime,
+          endTime
+        }
+      });
+
+      // 9. Return created reservation.
       res
         .status(201)
         .location(`${req.baseUrl}/${id}`)
@@ -225,6 +246,16 @@ router.get(
         status: query.status,
         limit,
         cursor: query.cursor
+      });
+
+      // Write security audit event after successful retrieval.
+      logSecurityEvent({
+        event: 'reservation.list',
+        actorId: req.principal.subject,
+        method: req.method,
+        path: req.originalUrl,
+        result: 'success',
+        requestId: req.id
       });
 
       const items = reservations.map(
@@ -282,7 +313,18 @@ router.get(
       const representation =
         toReservationRepresentation(reservation);
 
-      // 6. Return response.
+      // 6. Write security audit event.
+      logSecurityEvent({
+        event: 'reservation.read',
+        actorId: req.principal.subject,
+        method: req.method,
+        path: req.originalUrl,
+        resourceId: reservationId,
+        result: 'success',
+        requestId: req.id
+      });
+
+      // 7. Return response.
       res.status(200).json(representation);
     } catch (err) {
       next(err);
@@ -360,11 +402,25 @@ router.post(
         cancelReason
       );
 
-      // 9. Convert to API representation.
+      // 9. Write security audit event.
+      logSecurityEvent({
+        event: 'reservation.cancel',
+        actorId: req.principal.subject,
+        method: req.method,
+        path: req.originalUrl,
+        resourceId: reservationId,
+        result: 'success',
+        requestId: req.id,
+        metadata: {
+          reason: cancelReason
+        }
+      });
+
+      // 10. Convert to API representation.
       const representation =
         toCancellationRepresentation(cancelledReservation);
 
-      // 10. Return cancellation response.
+      // 11. Return cancellation response.
       res.status(201).json(representation);
     } catch (err) {
       next(err);
@@ -372,10 +428,15 @@ router.post(
   }
 );
 
-
+// -----------------------------------------------------------------------------
 // POST /v1/reservations/:reservationId/check-in
+// -----------------------------------------------------------------------------
+
 router.post(
-  ['/:reservationId/check-in', '/:reservationId/checkin'],
+  [
+    '/:reservationId/check-in',
+    '/:reservationId/checkin'
+  ],
   requireScope('reservations:checkin'),
   (req, res, next) => {
     try {
@@ -392,18 +453,43 @@ router.post(
       }
 
       if (!canAccessObject(req.principal, reservation)) {
-        return sendObjectAccessDenied(res, req, reservationId);
+        return sendObjectAccessDenied(
+          res,
+          req,
+          reservationId
+        );
       }
 
       if (reservation.status !== 'pending_checkin') {
-        const error = new Error('Reservation cannot be checked in.');
+        const error = new Error(
+          'Reservation cannot be checked in.'
+        );
+
         error.status = 409;
         throw error;
       }
 
-      const checkedInReservation = checkInReservation(reservationId);
+      const checkedInReservation =
+        checkInReservation(reservationId);
 
-      res.status(200).json(toReservationRepresentation(checkedInReservation));
+      // Write security audit event.
+      logSecurityEvent({
+        event: 'reservation.checkin',
+        actorId: req.principal.subject,
+        method: req.method,
+        path: req.originalUrl,
+        resourceId: reservationId,
+        result: 'success',
+        requestId: req.id
+      });
+
+      res
+        .status(200)
+        .json(
+          toReservationRepresentation(
+            checkedInReservation
+          )
+        );
     } catch (err) {
       next(err);
     }
