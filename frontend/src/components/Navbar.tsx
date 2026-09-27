@@ -15,6 +15,7 @@ export const Navbar: React.FC = () => {
   const {
     activePersonaKey,
     selectPersona,
+    signOut,
     principal,
     hasScope
   } = useAuth();
@@ -208,9 +209,21 @@ export const Navbar: React.FC = () => {
             </select>
 
           </div>
-
+          
+          <button
+            type="button"
+            onClick={signOut}
+            className="nav-link"
+            style={{
+              border: 'none',
+              background: 'transparent',
+              cursor: 'pointer'
+            }}
+          >
+            Sign Out
+          </button>
         </div>
-
+        
       </div>
     </header>
   );

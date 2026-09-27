@@ -2,6 +2,12 @@ import type { Room, Reservation, Cancellation, ProblemDetails, SecurityEvent, De
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/';
 
+let onUnauthorized: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  onUnauthorized = handler;
+}
+
 let currentAuthToken: string | null = null;
 let lastRequestId: string = '';
 
@@ -77,6 +83,10 @@ async function apiFetch<T>(
   const contentType = response.headers.get('content-type') || '';
 
   if (!response.ok) {
+    if (response.status === 401 && onUnauthorized) {
+      onUnauthorized();
+    }
+
     let problem: ProblemDetails;
     if (contentType.includes('application/problem+json') || contentType.includes('application/json')) {
       try {

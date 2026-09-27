@@ -18,6 +18,7 @@ import { RoomDetail } from './pages/RoomDetail';
 import { MyReservations } from './pages/MyReservations';
 import { SecurityDemo } from './pages/SecurityDemo';
 import { AuditDemo } from './pages/AuditDemo';
+import { SignIn } from './pages/SignIn';
 
 import { ShieldCheck, BookOpen } from 'lucide-react';
 
@@ -107,7 +108,10 @@ const AppContent: React.FC = () => {
       >
         <div className="container">
           <Routes>
-
+            <Route
+              path="/signin"
+              element={<SignIn />}
+            />
             {/* =========================================================
                 DASHBOARD
                 URL: /

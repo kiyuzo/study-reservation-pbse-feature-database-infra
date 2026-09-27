@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { DemoPersona, Principal } from '../types';
-import { setAuthToken, fetchDemoTokens, fetchCurrentPrincipal } from '../api/client';
+import {
+  setAuthToken,
+  fetchDemoTokens,
+  fetchCurrentPrincipal,
+  setUnauthorizedHandler
+} from '../api/client';
 
 interface AuthContextType {
   activePersonaKey: string;
@@ -10,6 +15,7 @@ interface AuthContextType {
   tokenFingerprint: string;
   scopes: string[];
   selectPersona: (key: string) => Promise<void>;
+  signOut: () => void;
   hasScope: (scope: string) => boolean;
   refreshPrincipal: () => Promise<void>;
   loading: boolean;
@@ -91,6 +97,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const signOut = () => {
+    setAuthToken(null);
+    setTokenFingerprint('None (Unauthenticated)');
+    setScopes([]);
+    setPrincipal(null);
+    setActivePersonaKey('unauthenticated');
+  };
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      const returnTo =
+        window.location.pathname +
+        window.location.search;
+
+      sessionStorage.setItem(
+        'authReturnPath',
+        returnTo
+      );
+
+      signOut();
+
+      window.location.href =
+        `/signin?returnTo=${encodeURIComponent(returnTo)}`;
+    });
+
+    return () => {
+      setUnauthorizedHandler(null);
+    };
+  }, []);
+
   const refreshPrincipal = async () => {
     try {
       const me = await fetchCurrentPrincipal();
@@ -140,6 +176,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         tokenFingerprint,
         scopes,
         selectPersona,
+        signOut,
         hasScope,
         refreshPrincipal,
         loading
