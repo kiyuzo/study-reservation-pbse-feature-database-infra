@@ -1,45 +1,110 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+
 import { AuthProvider } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
 import { Navbar } from './components/Navbar';
+
 import { Dashboard } from './pages/Dashboard';
 import { Rooms } from './pages/Rooms';
 import { RoomDetail } from './pages/RoomDetail';
 import { MyReservations } from './pages/MyReservations';
 import { SecurityDemo } from './pages/SecurityDemo';
 import { AuditDemo } from './pages/AuditDemo';
+
 import { ShieldCheck, BookOpen } from 'lucide-react';
 
 const AppContent: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<string>('dashboard');
-  const [selectedRoomId, setSelectedRoomId] = useState<string | null>('rm_1a2B3cD');
+  const navigate = useNavigate();
 
   const handleNavigate = (tab: string, entityId?: string) => {
-    setActiveTab(tab);
-    if (entityId) {
-      setSelectedRoomId(entityId);
+    switch (tab) {
+      case 'dashboard':
+        navigate('/');
+        break;
+
+      case 'rooms':
+        navigate('/rooms');
+        break;
+
+      case 'room-detail':
+        if (entityId) {
+          navigate(`/rooms/${entityId}`);
+        }
+        break;
+
+      case 'reservations':
+        navigate('/reservations');
+        break;
+
+      case 'security':
+        navigate('/security');
+        break;
+
+      case 'audit':
+        navigate('/audit');
+        break;
+
+      default:
+        navigate('/');
     }
+
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', background: 'var(--bg-app)' }}>
-      {/* Top Navigation */}
-      <Navbar activeTab={activeTab} setActiveTab={setActiveTab} />
+    <div
+      style={{
+        minHeight: '100vh',
+        display: 'flex',
+        flexDirection: 'column',
+        background: 'var(--bg-app)'
+      }}
+    >
+      <Navbar />
 
-      {/* Main Page Area */}
       <main style={{ flex: 1, padding: '24px 0' }}>
         <div className="container">
-          {activeTab === 'dashboard' && <Dashboard onNavigate={handleNavigate} />}
-          {activeTab === 'rooms' && <Rooms onNavigate={handleNavigate} />}
-          {activeTab === 'room-detail' && <RoomDetail roomId={selectedRoomId} onNavigate={handleNavigate} />}
-          {activeTab === 'reservations' && <MyReservations onNavigate={handleNavigate} />}
-          {activeTab === 'security' && <SecurityDemo />}
-          {activeTab === 'audit' && <AuditDemo />}
+          <Routes>
+            <Route
+              path="/"
+              element={<Dashboard onNavigate={handleNavigate} />}
+            />
+
+            <Route
+              path="/rooms"
+              element={<Rooms onNavigate={handleNavigate} />}
+            />
+
+            <Route
+              path="/rooms/:roomId"
+              element={<RoomDetailRoute onNavigate={handleNavigate} />}
+            />
+
+            <Route
+              path="/reservations"
+              element={<MyReservations onNavigate={handleNavigate} />}
+            />
+
+            <Route
+              path="/security"
+              element={<SecurityDemo />}
+            />
+
+            <Route
+              path="/audit"
+              element={<AuditDemo />}
+            />
+
+            {/* Fallback */}
+            <Route
+              path="*"
+              element={<Dashboard onNavigate={handleNavigate} />}
+            />
+          </Routes>
         </div>
       </main>
 
-      {/* University Library System Footer */}
       <footer
         style={{
           borderTop: '1px solid var(--border)',
@@ -81,12 +146,31 @@ const AppContent: React.FC = () => {
   );
 };
 
+/**
+ * Gets roomId directly from the URL:
+ * /rooms/:roomId
+ */
+const RoomDetailRoute: React.FC<{
+  onNavigate: (tab: string, entityId?: string) => void;
+}> = ({ onNavigate }) => {
+  const { roomId } = useParams<{ roomId: string }>();
+
+  return (
+    <RoomDetail
+      roomId={roomId ?? null}
+      onNavigate={onNavigate}
+    />
+  );
+};
+
 export default function App() {
   return (
-    <AuthProvider>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
-    </AuthProvider>
+    <BrowserRouter>
+      <AuthProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </AuthProvider>
+    </BrowserRouter>
   );
 }

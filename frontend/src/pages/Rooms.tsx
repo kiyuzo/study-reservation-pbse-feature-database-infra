@@ -12,7 +12,7 @@ interface RoomsProps {
 }
 
 export const Rooms: React.FC<RoomsProps> = ({ onNavigate }) => {
-  const { hasScope } = useAuth();
+  const { hasScope, activePersonaKey, loading: authLoading } = useAuth();
   const { showSuccess, showError } = useToast();
 
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -33,7 +33,10 @@ export const Rooms: React.FC<RoomsProps> = ({ onNavigate }) => {
   useEffect(() => {
     let mounted = true;
     async function load() {
+      if (authLoading) return;
+
       setLoading(true);
+      
       try {
         const data = await fetchRooms();
         if (mounted) setRooms(data);
@@ -47,7 +50,7 @@ export const Rooms: React.FC<RoomsProps> = ({ onNavigate }) => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [activePersonaKey, authLoading]);
 
   const openReserveModal = (room: Room) => {
     setSelectedRoom(room);
