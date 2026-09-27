@@ -30,6 +30,7 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
   const [room, setRoom] = useState<Room | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [roomErrorStatus, setRoomErrorStatus] = useState<number | null>(null);
 
   // Reservation form state
   const [date, setDate] = useState<string>('2026-11-15');
@@ -58,7 +59,13 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
         if (mounted) {
           if (roomData.status === 'fulfilled') {
             setRoom(roomData.value);
+            setRoomErrorStatus(null);
+          } else {
+            setRoomErrorStatus(
+              roomData.reason?.status || 500
+            );
           }
+          
           if (rsvData.status === 'fulfilled') {
             const allItems = (rsvData.value as any).items || [];
             setReservations(allItems.filter((r: Reservation) => r.roomId === roomId));
@@ -130,19 +137,28 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
   }
 
   if (!room) {
-    return (
-      <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
-        <AlertTriangle size={48} color="var(--accent-amber)" style={{ margin: '0 auto 16px' }} />
-        <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Room Not Found</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
-          The requested study room could not be loaded or was not specified.
-        </p>
-        <button className="btn btn-primary" onClick={() => onNavigate('rooms')}>
-          <ArrowLeft size={16} /> Return to Study Rooms
-        </button>
-      </div>
-    );
-  }
+    let title = 'Unable to Load Room';
+    let message = 'We could not load this room. Please try again.';
+
+    if (roomErrorStatus === 403) {
+      title = 'Access Denied';
+      message = 'You are authenticated, but you do not have permission to access this room.';
+    } else if (roomErrorStatus === 404 || !roomId) {
+      title = 'Room Not Found';
+      message = 'The requested study room could not be found.';
+    }
+
+  return (
+    <div className="card" style={{ maxWidth: '600px', margin: '40px auto', textAlign: 'center' }}>
+      <AlertTriangle size={48} style={{ marginBottom: '16px' }} />
+      <h2>{title}</h2>
+      <p>{message}</p>
+      <button onClick={() => onNavigate('rooms')}>
+        Back to Rooms
+      </button>
+    </div>
+  );
+}
 
   return (
     <div>
