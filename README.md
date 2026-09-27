@@ -35,6 +35,12 @@ The navigation menu changes according to the active persona's scopes:
 The frontend uses the same scope information provided by `AuthContext`
 for navigation visibility and route protection.
 
+### Session Storage & Authentication
+
+The frontend keeps the active authentication token in memory rather than `localStorage`, so the token is not persisted across a full browser refresh or stored as persistent browser data. This reduces the risk of a token remaining in browser storage, but it also means the user must authenticate again after a page reload.
+
+When authentication expires or the API returns `401 Unauthorized`, the frontend clears the in-memory session and temporarily stores the current return path in `sessionStorage` so the user can be redirected back after signing in. The return path is temporary and is cleared after it is used.
+
 ### URL-Based Routing
 
 The frontend uses React Router with `BrowserRouter`.
