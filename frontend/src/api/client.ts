@@ -1,5 +1,7 @@
 import type { Room, Reservation, Cancellation, ProblemDetails, SecurityEvent, DemoPersona } from '../types';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/';
+
 let currentAuthToken: string | null = null;
 let lastRequestId: string = '';
 
@@ -51,7 +53,7 @@ async function apiFetch<T>(
 
   let response: Response;
   try {
-    response = await fetch(path, {
+    response = await fetch(`${API_BASE_URL}${path.replace(/^\/+/, '')}`, {
       ...options,
       headers
     });
