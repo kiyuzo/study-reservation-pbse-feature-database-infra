@@ -1,10 +1,19 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
-import { fetchRoomById, createReservation, fetchReservations } from '../api/client';
-import type { Room, Reservation } from '../types';
+import { fetchRoomById, createReservation, fetchReservations, ProblemError } from '../api/client';
+import type { Room, Reservation, ViewState } from '../types';
 import { StatusBadge } from '../components/Badge';
 import { CardSkeleton } from '../components/LoadingSkeleton';
+import { ViewErrorPanel, FieldError, FormErrorBanner } from '../components/ViewErrorPanel';
+import {
+  validateBookingInput,
+  mapProblemToBookingFields,
+  domainMessageFromProblem,
+  problemFromUnknown,
+  hasFieldErrors,
+  type BookingFieldErrors
+} from '../lib/formErrors';
 import {
   ArrowLeft,
   Users,
@@ -15,7 +24,8 @@ import {
   Wifi,
   Monitor,
   VolumeX,
-  Check
+  Check,
+  KeyRound
 } from 'lucide-react';
 
 interface RoomDetailProps {
@@ -23,64 +33,101 @@ interface RoomDetailProps {
   onNavigate: (tab: string, entityId?: string) => void;
 }
 
+interface RoomDetailData {
+  room: Room;
+  reservations: Reservation[];
+}
+
+function defaultBookingDate(): string {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().slice(0, 10);
+}
+
 export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) => {
   const { hasScope, activePersonaKey } = useAuth();
   const { showSuccess, showError } = useToast();
 
-  const [room, setRoom] = useState<Room | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
-  const [reservations, setReservations] = useState<Reservation[]>([]);
+  const [view, setView] = useState<ViewState<RoomDetailData>>({ kind: 'loading' });
 
-  // Reservation form state
-  const [date, setDate] = useState<string>('2026-11-15');
+  const [date, setDate] = useState<string>(defaultBookingDate);
   const [startTime, setStartTime] = useState<string>('14:00');
   const [endTime, setEndTime] = useState<string>('16:00');
-  const [idempotencyKey, setIdempotencyKey] = useState<string>(crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState<string>(() => crypto.randomUUID());
   const [booking, setBooking] = useState<boolean>(false);
   const [bookedSuccess, setBookedSuccess] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<BookingFieldErrors>({});
 
   const canReserve = hasScope('reservations:create') || hasScope('reservations:write');
 
-  useEffect(() => {
-    let mounted = true;
-    async function load() {
-      if (!roomId) {
-        setLoading(false);
-        return;
-      }
-      setLoading(true);
-      try {
-        const [roomData, rsvData] = await Promise.allSettled([
-          fetchRoomById(roomId),
-          hasScope('reservations:read') ? fetchReservations() : Promise.resolve({ items: [] })
-        ]);
-
-        if (mounted) {
-          if (roomData.status === 'fulfilled') {
-            setRoom(roomData.value);
-          }
-          if (rsvData.status === 'fulfilled') {
-            const allItems = (rsvData.value as any).items || [];
-            setReservations(allItems.filter((r: Reservation) => r.roomId === roomId));
-          }
-        }
-      } catch (err: any) {
-        if (mounted) showError(err);
-      } finally {
-        if (mounted) setLoading(false);
-      }
+  const loadRoom = useCallback(async () => {
+    if (!roomId) {
+      setView({
+        kind: 'error',
+        problem: {
+          type: 'https://api.library.example/problems/not-found',
+          title: 'Room Not Found',
+          status: 404,
+          detail: 'No study room was selected. Choose a room from the catalogue.'
+        },
+        willRetry: false
+      });
+      return;
     }
 
-    load();
-    return () => {
-      mounted = false;
-    };
-  }, [roomId, activePersonaKey]);
+    setView({ kind: 'loading' });
+    try {
+      const roomData = await fetchRoomById(roomId);
+      let reservations: Reservation[] = [];
+      if (hasScope('reservations:read')) {
+        try {
+          const rsvData = await fetchReservations();
+          reservations = (rsvData.items || []).filter((r) => r.roomId === roomId);
+        } catch {
+          // Room still loads; bookings list is optional context.
+          reservations = [];
+        }
+      }
+      setView({
+        kind: 'content',
+        data: { room: roomData, reservations },
+        fetchedAt: new Date()
+      });
+      setIdempotencyKey(crypto.randomUUID());
+      setFieldErrors({});
+      setBookedSuccess(null);
+    } catch (err: unknown) {
+      const problem = problemFromUnknown(err);
+      showError(err instanceof ProblemError ? err : new ProblemError(problem, problem.requestId || ''));
+      setView({
+        kind: 'error',
+        problem,
+        willRetry: problem.status !== 403
+      });
+    }
+  }, [roomId, hasScope, showError]);
+
+  useEffect(() => {
+    loadRoom();
+  }, [loadRoom, activePersonaKey]);
 
   const handleBookingSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!room) return;
+    if (view.kind !== 'content') return;
+    const room = view.data.room;
 
+    const clientErrors = validateBookingInput({
+      roomId: room.id,
+      date,
+      startTime,
+      endTime
+    });
+    if (hasFieldErrors(clientErrors)) {
+      setFieldErrors(clientErrors);
+      return;
+    }
+
+    setFieldErrors({});
     setBooking(true);
     setBookedSuccess(null);
     try {
@@ -101,19 +148,36 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
       );
       setIdempotencyKey(crypto.randomUUID());
 
-      // Refresh list
       if (hasScope('reservations:read')) {
-        const rsvData = await fetchReservations();
-        setReservations(rsvData.items.filter((r) => r.roomId === room.id));
+        try {
+          const rsvData = await fetchReservations();
+          setView({
+            kind: 'content',
+            data: {
+              room,
+              reservations: rsvData.items.filter((r) => r.roomId === room.id)
+            },
+            fetchedAt: new Date()
+          });
+        } catch {
+          // Keep prior content on refresh failure.
+        }
       }
-    } catch (err: any) {
-      showError(err);
+    } catch (err: unknown) {
+      const problem = problemFromUnknown(err);
+      const mapped = mapProblemToBookingFields(problem);
+      if (hasFieldErrors(mapped)) {
+        setFieldErrors(mapped);
+      } else {
+        setFieldErrors({ form: domainMessageFromProblem(problem) });
+      }
+      showError(err instanceof ProblemError ? err : new ProblemError(problem, problem.requestId || ''));
     } finally {
       setBooking(false);
     }
   };
 
-  if (loading) {
+  if (view.kind === 'loading') {
     return (
       <div>
         <div style={{ marginBottom: '24px' }}>
@@ -129,14 +193,29 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
     );
   }
 
-  if (!room) {
+  if (view.kind === 'error') {
+    return (
+      <div>
+        <div style={{ marginBottom: '24px' }}>
+          <button className="btn btn-sm btn-outline" onClick={() => onNavigate('rooms')}>
+            <ArrowLeft size={16} /> Back to Rooms
+          </button>
+        </div>
+        <ViewErrorPanel
+          problem={view.problem}
+          willRetry={view.willRetry}
+          onRetry={loadRoom}
+          title="Could not load this study room"
+        />
+      </div>
+    );
+  }
+
+  if (view.kind === 'empty') {
     return (
       <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
         <AlertTriangle size={48} color="var(--accent-amber)" style={{ margin: '0 auto 16px' }} />
         <h2 style={{ fontSize: '1.2rem', fontWeight: 700, marginBottom: '8px' }}>Room Not Found</h2>
-        <p style={{ color: 'var(--text-muted)', marginBottom: '20px' }}>
-          The requested study room could not be loaded or was not specified.
-        </p>
         <button className="btn btn-primary" onClick={() => onNavigate('rooms')}>
           <ArrowLeft size={16} /> Return to Study Rooms
         </button>
@@ -144,9 +223,10 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
     );
   }
 
+  const { room, reservations } = view.data;
+
   return (
     <div>
-      {/* Top Breadcrumb / Back Bar */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <button className="btn btn-sm btn-outline" onClick={() => onNavigate('rooms')}>
           <ArrowLeft size={16} /> Back to Study Rooms
@@ -165,7 +245,6 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
         </div>
       </div>
 
-      {/* Main Room Header Banner */}
       <div
         className="card mb-lg"
         style={{
@@ -234,11 +313,8 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
         </div>
       </div>
 
-      {/* Grid Layout: Room Details & Booking Form */}
       <div className="grid-12 gap-lg mb-xl">
-        {/* Left Column: Room Specs, Amenities, Policies (8 cols) */}
         <div className="col-span-7" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-          {/* Amenities & Hardware Specs */}
           <div className="card">
             <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--primary-900)', marginBottom: '16px' }}>
               Equipped Amenities & Hardware
@@ -286,7 +362,6 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
             </div>
           </div>
 
-          {/* Usage Policies & Security Layer Rules */}
           <div className="card">
             <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--primary-900)', marginBottom: '16px' }}>
               Library Reservation & Security Policy
@@ -311,14 +386,16 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
             </div>
           </div>
 
-          {/* Upcoming Schedule for this Room */}
           <div className="card">
             <h2 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--primary-900)', marginBottom: '14px' }}>
               Current Bookings for {room.name}
             </h2>
+            <p style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginBottom: '10px' }}>
+              As of {view.fetchedAt.toLocaleTimeString()}.
+            </p>
             {reservations.length === 0 ? (
               <p style={{ fontSize: '0.88rem', color: 'var(--text-muted)', margin: 0 }}>
-                No active bookings recorded for this space today. Space is open!
+                No active bookings recorded for this space. The room is open to reserve.
               </p>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
@@ -350,7 +427,6 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
           </div>
         </div>
 
-        {/* Right Column: Direct Reservation Form (5 cols) */}
         <div className="col-span-5" id="booking-section">
           <div className="card" style={{ position: 'sticky', top: '96px' }}>
             <h2 style={{ fontSize: '1.2rem', fontWeight: 800, color: 'var(--primary-900)', marginBottom: '6px' }}>
@@ -401,7 +477,9 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
               </div>
             ) : null}
 
-            <form onSubmit={handleBookingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            <form onSubmit={handleBookingSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} noValidate>
+              <FormErrorBanner message={fieldErrors.form} />
+
               <div className="form-group">
                 <label className="form-label" htmlFor="reserveDate">
                   Booking Date
@@ -410,10 +488,14 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
                   id="reserveDate"
                   type="date"
                   className="form-input"
-                  required
                   value={date}
-                  onChange={(e) => setDate(e.target.value)}
+                  onChange={(e) => {
+                    setDate(e.target.value);
+                    setFieldErrors((prev) => ({ ...prev, date: undefined, form: undefined }));
+                  }}
+                  aria-invalid={Boolean(fieldErrors.date)}
                 />
+                <FieldError message={fieldErrors.date} />
               </div>
 
               <div className="grid-2 gap-md">
@@ -425,10 +507,14 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
                     id="reserveStartTime"
                     type="time"
                     className="form-input"
-                    required
                     value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    onChange={(e) => {
+                      setStartTime(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, startTime: undefined, endTime: undefined, form: undefined }));
+                    }}
+                    aria-invalid={Boolean(fieldErrors.startTime)}
                   />
+                  <FieldError message={fieldErrors.startTime} />
                 </div>
 
                 <div className="form-group">
@@ -439,14 +525,17 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
                     id="reserveEndTime"
                     type="time"
                     className="form-input"
-                    required
                     value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
+                    onChange={(e) => {
+                      setEndTime(e.target.value);
+                      setFieldErrors((prev) => ({ ...prev, endTime: undefined, form: undefined }));
+                    }}
+                    aria-invalid={Boolean(fieldErrors.endTime)}
                   />
+                  <FieldError message={fieldErrors.endTime} />
                 </div>
               </div>
 
-              {/* Idempotency Key preview */}
               <div
                 style={{
                   padding: '8px 12px',
@@ -455,12 +544,24 @@ export const RoomDetail: React.FC<RoomDetailProps> = ({ roomId, onNavigate }) =>
                   fontSize: '0.74rem',
                   color: 'var(--text-muted)',
                   fontFamily: 'monospace',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                  flexWrap: 'wrap'
                 }}
               >
-                Idempotency-Key: {idempotencyKey}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  Idempotency-Key: {idempotencyKey}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  disabled={booking}
+                  onClick={() => setIdempotencyKey(crypto.randomUUID())}
+                >
+                  <KeyRound size={12} /> New key
+                </button>
               </div>
 
               <button

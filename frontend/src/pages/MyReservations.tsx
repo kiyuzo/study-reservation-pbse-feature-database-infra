@@ -1,11 +1,17 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../components/Toast';
-import { fetchReservations, cancelReservation, checkInReservation } from '../api/client';
-import type { Reservation } from '../types';
+import { fetchReservations, cancelReservation, checkInReservation, ProblemError } from '../api/client';
+import type { Reservation, ViewState } from '../types';
 import { Badge, StatusBadge } from '../components/Badge';
 import { Modal } from '../components/Modal';
 import { TableSkeleton } from '../components/LoadingSkeleton';
+import { ViewErrorPanel, FieldError, FormErrorBanner } from '../components/ViewErrorPanel';
+import {
+  validateCancelReason,
+  domainMessageFromProblem,
+  problemFromUnknown
+} from '../lib/formErrors';
 import {
   Calendar,
   Clock,
@@ -26,51 +32,59 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
   const { activePersonaKey, principal, hasScope } = useAuth();
   const { showSuccess, showError } = useToast();
 
-  const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [view, setView] = useState<ViewState<Reservation[]>>({ kind: 'loading' });
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedReservation, setSelectedReservation] = useState<Reservation | null>(null);
 
-  // Cancellation modal state
   const [cancelModalOpen, setCancelModalOpen] = useState<boolean>(false);
   const [targetReservation, setTargetReservation] = useState<Reservation | null>(null);
   const [cancelReason, setCancelReason] = useState<string>('');
+  const [cancelReasonError, setCancelReasonError] = useState<string | null>(null);
+  const [cancelFormError, setCancelFormError] = useState<string | null>(null);
   const [cancelling, setCancelling] = useState<boolean>(false);
 
-  // Checkin state
   const [checkingInId, setCheckingInId] = useState<string | null>(null);
 
   const canReadReservations = hasScope('reservations:read') || hasScope('admin:manage');
   const canCancel = hasScope('reservations:cancel') || hasScope('reservations:write') || hasScope('admin:manage');
   const canCheckIn = hasScope('reservations:checkin') || hasScope('admin:manage');
 
-  const loadReservations = async () => {
+  const loadReservations = useCallback(async () => {
     if (!canReadReservations) {
-      setReservations([]);
-      setLoading(false);
+      setView({ kind: 'empty' });
       return;
     }
 
-    setLoading(true);
+    setView({ kind: 'loading' });
     try {
       const filter = statusFilter === 'all' ? undefined : statusFilter;
       const res = await fetchReservations(filter);
-      setReservations(res.items || []);
-    } catch (err: any) {
-      showError(err);
-      setReservations([]);
-    } finally {
-      setLoading(false);
+      const items = res.items || [];
+      if (items.length === 0) {
+        setView({ kind: 'empty' });
+      } else {
+        setView({ kind: 'content', data: items, fetchedAt: new Date() });
+      }
+    } catch (err: unknown) {
+      const problem = problemFromUnknown(err);
+      showError(err instanceof ProblemError ? err : new ProblemError(problem, problem.requestId || ''));
+      setView({
+        kind: 'error',
+        problem,
+        willRetry: problem.status !== 403
+      });
     }
-  };
+  }, [canReadReservations, statusFilter, showError]);
 
   useEffect(() => {
     loadReservations();
-  }, [activePersonaKey, statusFilter]);
+  }, [loadReservations, activePersonaKey]);
 
   const handleOpenCancel = (r: Reservation) => {
     setTargetReservation(r);
     setCancelReason('Schedule conflict / Exam completed early');
+    setCancelReasonError(null);
+    setCancelFormError(null);
     setCancelModalOpen(true);
   };
 
@@ -78,6 +92,14 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
     e.preventDefault();
     if (!targetReservation) return;
 
+    const reasonError = validateCancelReason(cancelReason);
+    if (reasonError) {
+      setCancelReasonError(reasonError);
+      return;
+    }
+
+    setCancelReasonError(null);
+    setCancelFormError(null);
     setCancelling(true);
     try {
       const cancellation = await cancelReservation(targetReservation.id, cancelReason);
@@ -88,8 +110,14 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
       setCancelModalOpen(false);
       setTargetReservation(null);
       await loadReservations();
-    } catch (err: any) {
-      showError(err);
+    } catch (err: unknown) {
+      const problem = problemFromUnknown(err);
+      if (problem.fields?.reason) {
+        setCancelReasonError(problem.fields.reason);
+      } else {
+        setCancelFormError(domainMessageFromProblem(problem));
+      }
+      showError(err instanceof ProblemError ? err : new ProblemError(problem, problem.requestId || ''));
     } finally {
       setCancelling(false);
     }
@@ -101,8 +129,9 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
       const updated = await checkInReservation(r.id);
       showSuccess('Checked In Successfully', `You have checked in for ${updated.id}. Your desk is ready!`);
       await loadReservations();
-    } catch (err: any) {
-      showError(err);
+    } catch (err: unknown) {
+      const problem = problemFromUnknown(err);
+      showError(err instanceof ProblemError ? err : new ProblemError(problem, problem.requestId || ''));
     } finally {
       setCheckingInId(null);
     }
@@ -113,6 +142,11 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
     if (principal.kind === 'staff' || principal.scopes.includes('admin:manage')) return true;
     return r.userId === principal.subject;
   };
+
+  const canShowCancel = (r: Reservation) =>
+    r.status === 'pending_checkin' || Boolean(r.cancellable);
+
+  const reservations = view.kind === 'content' ? view.data : [];
 
   return (
     <div>
@@ -129,6 +163,7 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
             onClick={() => loadReservations()}
             className="btn btn-secondary"
             title="Refresh list from backend"
+            disabled={!canReadReservations || view.kind === 'loading'}
           >
             <RotateCcw size={16} />
             Refresh
@@ -143,7 +178,6 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
         </div>
       </div>
 
-      {/* Layer 3 Security Callout Banner */}
       <div
         className="card"
         style={{
@@ -186,7 +220,6 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
         </div>
       </div>
 
-      {/* Filters Bar */}
       <div
         className="card"
         style={{
@@ -210,6 +243,7 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
                 onClick={() => setStatusFilter(status)}
                 className={`btn btn-sm ${statusFilter === status ? 'btn-primary' : 'btn-secondary'}`}
                 style={{ textTransform: 'capitalize' }}
+                disabled={!canReadReservations}
               >
                 {status.replace('_', ' ')}
               </button>
@@ -218,11 +252,17 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
         </div>
 
         <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>
-          Showing <strong>{reservations.length}</strong> reservation{reservations.length === 1 ? '' : 's'}
+          {view.kind === 'content' ? (
+            <>
+              Showing <strong>{reservations.length}</strong> reservation{reservations.length === 1 ? '' : 's'}
+              {' · '}as of {view.fetchedAt.toLocaleTimeString()}
+            </>
+          ) : (
+            '—'
+          )}
         </div>
       </div>
 
-      {/* Main Content Area */}
       {!canReadReservations ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
           <AlertTriangle size={48} color="var(--accent-amber)" style={{ margin: '0 auto 16px' }} />
@@ -242,9 +282,16 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
             Test Permissions in Security Matrix
           </button>
         </div>
-      ) : loading ? (
+      ) : view.kind === 'loading' ? (
         <TableSkeleton rows={4} />
-      ) : reservations.length === 0 ? (
+      ) : view.kind === 'error' ? (
+        <ViewErrorPanel
+          problem={view.problem}
+          willRetry={view.willRetry}
+          onRetry={loadReservations}
+          title="Could not load reservations"
+        />
+      ) : view.kind === 'empty' ? (
         <div className="card" style={{ textAlign: 'center', padding: '48px 24px' }}>
           <Calendar size={48} color="var(--primary-300)" style={{ margin: '0 auto 16px' }} />
           <h3 style={{ fontSize: '1.15rem', fontWeight: 700, marginBottom: '6px' }}>
@@ -253,9 +300,14 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
           <p style={{ maxWidth: '420px', margin: '0 auto 20px', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
             There are currently no {statusFilter !== 'all' ? statusFilter.replace('_', ' ') : ''} reservations matching your active filter.
           </p>
-          <button onClick={() => onNavigate('rooms')} className="btn btn-primary" style={{ margin: '0 auto' }}>
-            Browse Study Rooms
-          </button>
+          <div style={{ display: 'flex', gap: '10px', justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button onClick={() => loadReservations()} className="btn btn-secondary">
+              <RotateCcw size={16} /> Retry
+            </button>
+            <button onClick={() => onNavigate('rooms')} className="btn btn-primary">
+              Browse Study Rooms
+            </button>
+          </div>
         </div>
       ) : (
         <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
@@ -308,7 +360,7 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
                             fontWeight: 600
                           }}
                         >
-                          {r.userId || 'student-a'}
+                          {r.userId || '—'}
                         </span>
                         {ownerMatch && (
                           <span title="You own this resource" style={{ color: 'var(--accent-emerald)', display: 'flex' }}>
@@ -322,7 +374,6 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
                     </td>
                     <td style={{ textAlign: 'right' }}>
                       <div style={{ display: 'inline-flex', gap: '8px' }}>
-                        {/* Check In Action */}
                         {(r.canCheckIn || r.status === 'pending_checkin') && (
                           <button
                             onClick={() => handleExecuteCheckIn(r)}
@@ -345,11 +396,10 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
                           </button>
                         )}
 
-                        {/* Cancel Action */}
-                        {(r.cancellable || r.status !== 'cancelled') && (
+                        {canShowCancel(r) && (
                           <button
                             onClick={() => handleOpenCancel(r)}
-                            disabled={!canCancel || !ownerMatch}
+                            disabled={!canCancel || !ownerMatch || cancelling}
                             className="btn btn-sm btn-outline"
                             style={{
                               borderColor: 'var(--accent-rose)',
@@ -368,7 +418,6 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
                           </button>
                         )}
 
-                        {/* Inspect Action */}
                         <button
                           onClick={() => setSelectedReservation(r)}
                           className="btn btn-sm btn-secondary"
@@ -386,7 +435,6 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
         </div>
       )}
 
-      {/* Reservation Details Modal */}
       {selectedReservation && (
         <Modal
           isOpen={true}
@@ -455,14 +503,13 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
         </Modal>
       )}
 
-      {/* Cancellation Confirmation Modal */}
       {cancelModalOpen && targetReservation && (
         <Modal
           isOpen={true}
-          onClose={() => setCancelModalOpen(false)}
+          onClose={() => !cancelling && setCancelModalOpen(false)}
           title="Confirm Reservation Cancellation"
         >
-          <form onSubmit={handleExecuteCancel} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <form onSubmit={handleExecuteCancel} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }} noValidate>
             <div
               style={{
                 background: 'rgba(239, 68, 68, 0.08)',
@@ -475,8 +522,10 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
             >
               <strong>Warning:</strong> You are about to cancel booking <code>{targetReservation.id}</code> for room{' '}
               <strong>{targetReservation.roomId}</strong> on {targetReservation.date} ({targetReservation.startTime}–{targetReservation.endTime}).
-              This action is permanent and frees the room for other students.
+              This action frees the room for other students.
             </div>
+
+            <FormErrorBanner message={cancelFormError || undefined} />
 
             <div className="form-group">
               <label className="form-label" htmlFor="cancelReasonInput">
@@ -486,11 +535,17 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
                 id="cancelReasonInput"
                 className="form-input"
                 rows={3}
-                required
                 value={cancelReason}
-                onChange={(e) => setCancelReason(e.target.value)}
+                onChange={(e) => {
+                  setCancelReason(e.target.value);
+                  setCancelReasonError(null);
+                  setCancelFormError(null);
+                }}
                 placeholder="Please state why you are cancelling..."
+                aria-invalid={Boolean(cancelReasonError)}
+                disabled={cancelling}
               />
+              <FieldError message={cancelReasonError || undefined} />
             </div>
 
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginTop: '8px' }}>
@@ -505,7 +560,7 @@ export const MyReservations: React.FC<MyReservationsProps> = ({ onNavigate }) =>
               <button
                 type="submit"
                 className="btn btn-danger"
-                disabled={cancelling || !cancelReason.trim()}
+                disabled={cancelling}
               >
                 {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}
               </button>

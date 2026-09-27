@@ -26,6 +26,11 @@ export interface Cancellation {
   cancelledAt: string;
 }
 
+export interface InvalidParam {
+  name: string;
+  reason: string;
+}
+
 export interface ProblemDetails {
   type: string;
   title: string;
@@ -33,11 +38,20 @@ export interface ProblemDetails {
   detail?: string;
   instance?: string;
   fields?: Record<string, string>;
+  invalidParams?: InvalidParam[];
   from?: string;
   to?: string;
   allowedFrom?: string[];
+  conflictingReservationId?: string;
   requestId?: string;
 }
+
+/** Explicit view states for service-backed screens (PDF A.5). */
+export type ViewState<T> =
+  | { kind: 'loading' }
+  | { kind: 'empty' }
+  | { kind: 'error'; problem: ProblemDetails; willRetry: boolean }
+  | { kind: 'content'; data: T; fetchedAt: Date };
 
 export interface SecurityEvent {
   timestamp: string;
