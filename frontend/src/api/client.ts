@@ -172,18 +172,38 @@ export async function createReservation(
 
 export async function cancelReservation(
   reservationId: string,
-  reason: string
+  reason: string,
+  idempotencyKey?: string
 ): Promise<Cancellation> {
-  return apiFetch<Cancellation>(`/v1/reservations/${encodeURIComponent(reservationId)}/cancellation`, {
-    method: 'POST',
-    body: JSON.stringify({ reason })
-  });
+  const key = idempotencyKey || crypto.randomUUID();
+
+  return apiFetch<Cancellation>(
+    `/v1/reservations/${encodeURIComponent(reservationId)}/cancellation`,
+    {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    },
+    {
+      'Idempotency-Key': key
+    }
+  );
 }
 
-export async function checkInReservation(reservationId: string): Promise<Reservation> {
-  return apiFetch<Reservation>(`/v1/reservations/${encodeURIComponent(reservationId)}/checkin`, {
-    method: 'POST'
-  });
+export async function checkInReservation(
+  reservationId: string,
+  idempotencyKey?: string
+): Promise<Reservation> {
+  const key = idempotencyKey || crypto.randomUUID();
+
+  return apiFetch<Reservation>(
+    `/v1/reservations/${encodeURIComponent(reservationId)}/checkin`,
+    {
+      method: 'POST'
+    },
+    {
+      'Idempotency-Key': key
+    }
+  );
 }
 
 // ---------------------------------------------------------------------------
