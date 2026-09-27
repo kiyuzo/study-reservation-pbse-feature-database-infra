@@ -13,6 +13,42 @@ A student checks the availability of study rooms in the library on a given date 
 2. **Room Display Screen (IoT Device):** Outside each room, syncs room schedules and handles check-ins.
 3. **Automated Cleanup Job (Background Worker):** Sweeps abandoned reservations (`pending_checkin` -> `no_show`).
 
+### Workflow Mapping
+
+| Workflow | UI Screen(s) | Role / Access | URL | API Operation(s) |
+| :--- | :--- | :--- | :--- | :--- |
+| Browse available study rooms | Dashboard → Study Rooms | Student / Staff / Admin with room access | `/rooms` | `GET /v1/rooms` |
+| Inspect a study room and reserve it | Study Rooms → Room Detail → Reservation | Student / Staff / Admin with reservation-create access | `/rooms/{roomId}` | `GET /v1/rooms/{roomId}`; `POST /v1/reservations` |
+| Review personal reservations | My Reservations | Student / Staff / Admin with reservation-read access | `/reservations` | `GET /v1/reservations` |
+| Cancel a pending reservation | My Reservations | Student / Staff / Admin with reservation-cancel access | `/reservations` | `POST /v1/reservations/{reservationId}/cancellation` |
+
+### Role-Based Navigation
+
+The navigation menu changes according to the active persona's scopes:
+
+- **Dashboard** — available as the main entry point.
+- **Study Rooms** — available for room browsing.
+- **My Reservations** — displayed when the active persona has `reservations:read`.
+- **Security & Access** — displayed when the active persona has `admin:manage`.
+- **Audit Logs** — displayed when the active persona has `admin:manage`.
+
+The frontend uses the same scope information provided by `AuthContext`
+for navigation visibility and route protection.
+
+### URL-Based Routing
+
+The frontend uses React Router with `BrowserRouter`.
+
+Each main workflow has its own URL:
+
+```text
+/                       → Dashboard
+/rooms                  → Study Rooms
+/rooms/{roomId}         → Room Detail
+/reservations           → My Reservations
+/security               → Security & Access
+/audit                  → Audit Logs
+
 ---
 
 ## 📁 Repository Structure
@@ -55,49 +91,7 @@ A student checks the availability of study rooms in the library on a given date 
 
 ---
 
-## 👥 Team Roles & Responsibilities
-
-| Role | Focus Area | Owned Files | Branch |
-| :--- | :--- | :--- | :--- |
-| **PERSON 1** | **Database + App Infrastructure** | `service/db/*`, `service/.env.example`, `service/src/app.js`, `service/README.md` | `feature/database-infra` |
-| **PERSON 2** | **Study Room Resource** | `service/src/routes/rooms.js`, `service/src/schemas/rooms.js`, `service/src/store/rooms.js`, `service/src/representations/rooms.js`, `tests/contract/rooms.test.js` | `feature/rooms` |
-| **PERSON 3** | **Reservation Resource** | `service/src/routes/reservations.js`, `service/src/schemas/reservations.js`, `service/src/store/reservations.js`, `service/src/representations/reservations.js`, `tests/contract/reservations.test.js` | `feature/reservations` |
-| **PERSON 4** | **Errors + Idempotency + CI** | `service/src/problem.js`, `service/src/store/idempotency.js`, `tests/contract/*`, `tests/idempotency/*`, `docs/decisions/*`, `.github/*` | `feature/errors-idempotency` |
-
----
-
-## 🔒 File Ownership Boundaries
-
-**Rule:** Nobody casually edits another person's files!
-
-- **Person 1 should NOT touch:** `src/routes/`, `src/schemas/`, `src/store/`, `src/representations/`, `src/problem.js`.
-- **Person 2 and 3:** All database queries MUST live inside `store/`. Never write SQL in routes or return raw DB rows.
-- **Dependency 1 (P3 ↔ P4):** Person 3 calls Person 4's idempotency store (`checkIdempotencyKey`, `saveIdempotencyResult`).
-- **Dependency 2 (P1 ↔ Everyone):** Everyone depends on `schema.sql`. P1 creates the initial schema first, then freezes it. Any schema change requires team agreement before P1 modifies it.
-
----
-
-## 🧪 Test Results and Analysis (Person 4)
-
-### 1. Test Execution Summary
-
-The test suite executed with **100% pass rate** across all suites:
-
-```text
-PASS ../tests/contract/reservations.test.js (18 tests)
-PASS ../tests/contract/rooms.test.js (5 tests)
-PASS ../tests/idempotency/idempotency.test.js (9 tests)
-
-Test Suites: 3 passed, 3 total
-Tests:       32 passed, 32 total
-Snapshots:   0 total
-Time:        0.764 s
-Ran all test suites.
-```
-
----
-
-### 2. Contract Conformance Test Results & Analysis (`tests/contract/`)
+### Contract Conformance Test Results & Analysis (`tests/contract/`)
 
 #### A. Study Room Resource (`tests/contract/rooms.test.js` — 5/5 Passed)
 - **`GET /v1/rooms` (Collection Read):**
@@ -128,7 +122,7 @@ Ran all test suites.
 
 ---
 
-### 3. Server-Side Idempotency Analysis (`tests/idempotency/`)
+### Server-Side Idempotency Analysis (`tests/idempotency/`)
 
 Server-side idempotency is implemented in `service/src/store/idempotency.js` using SQLite table `idempotency_keys` with SHA-256 request payload hashing.
 

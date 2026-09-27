@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavLink } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
+
 import {
   BookOpen,
   ShieldCheck,
@@ -14,30 +15,61 @@ export const Navbar: React.FC = () => {
   const {
     activePersonaKey,
     selectPersona,
-    principal
+    principal,
+    hasScope
   } = useAuth();
+
+  /*
+   * Role-based navigation.
+   *
+   * reservations:read
+   *   -> Student / Staff / Admin with reservation access
+   *
+   * admin:manage
+   *   -> Staff / Admin
+   *
+   * Dashboard and Study Rooms remain available as the
+   * general library navigation.
+   */
+  const canViewReservations = hasScope('reservations:read');
+  const canViewAdminPages = hasScope('admin:manage');
 
   return (
     <header className="navbar">
       <div className="navbar-inner">
 
-        {/* Brand */}
-        <NavLink to="/" className="brand">
+        {/* =========================================================
+            BRAND
+        ========================================================= */}
+        <NavLink
+          to="/"
+          className="brand"
+          aria-label="Go to Dashboard"
+        >
           <div className="brand-icon">
             <BookOpen size={22} />
           </div>
 
           <div className="brand-text">
-            <div className="brand-title">University Library</div>
+            <div className="brand-title">
+              University Library
+            </div>
+
             <div className="brand-subtitle">
               Study Room Reservation System
             </div>
           </div>
         </NavLink>
 
-        {/* Navigation */}
-        <nav className="nav-links" aria-label="Main Navigation">
+        {/* =========================================================
+            MAIN NAVIGATION
+        ========================================================= */}
+        <nav
+          className="nav-links"
+          aria-label="Main Navigation"
+        >
 
+          {/* Dashboard - available to all personas */}
           <NavLink
             to="/"
             end
@@ -49,6 +81,7 @@ export const Navbar: React.FC = () => {
             Dashboard
           </NavLink>
 
+          {/* Study Rooms - available to all personas */}
           <NavLink
             to="/rooms"
             className={({ isActive }) =>
@@ -59,39 +92,53 @@ export const Navbar: React.FC = () => {
             Study Rooms
           </NavLink>
 
-          <NavLink
-            to="/reservations"
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-          >
-            <Calendar size={18} />
-            My Reservations
-          </NavLink>
+          {/* My Reservations - reservation scope */}
+          {canViewReservations && (
+            <NavLink
+              to="/reservations"
+              className={({ isActive }) =>
+                `nav-link ${isActive ? 'active' : ''}`
+              }
+            >
+              <Calendar size={18} />
+              My Reservations
+            </NavLink>
+          )}
 
-          <NavLink
-            to="/security"
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-          >
-            <ShieldCheck size={18} color="#d97706" />
-            Security & Access
-          </NavLink>
+          {/* Security & Access - admin scope */}
+          {canViewAdminPages && (
+            <NavLink
+              to="/security"
+              className={({ isActive }) =>
+                `nav-link ${isActive ? 'active' : ''}`
+              }
+            >
+              <ShieldCheck
+                size={18}
+                color="#d97706"
+              />
+              Security & Access
+            </NavLink>
+          )}
 
-          <NavLink
-            to="/audit"
-            className={({ isActive }) =>
-              `nav-link ${isActive ? 'active' : ''}`
-            }
-          >
-            <Activity size={18} />
-            Audit Logs
-          </NavLink>
+          {/* Audit Logs - admin scope */}
+          {canViewAdminPages && (
+            <NavLink
+              to="/audit"
+              className={({ isActive }) =>
+                `nav-link ${isActive ? 'active' : ''}`
+              }
+            >
+              <Activity size={18} />
+              Audit Logs
+            </NavLink>
+          )}
 
         </nav>
 
-        {/* Persona Switcher */}
+        {/* =========================================================
+            PERSONA SWITCHER
+        ========================================================= */}
         <div className="role-switcher-container">
 
           <div className="role-meta">
@@ -100,11 +147,14 @@ export const Navbar: React.FC = () => {
             </span>
 
             <span className="role-meta-val">
-              {principal ? principal.subject : activePersonaKey}
+              {principal
+                ? principal.subject
+                : activePersonaKey}
             </span>
           </div>
 
           <div className="role-selector-wrap">
+
             <UserCheck
               size={16}
               color="var(--accent-amber)"
@@ -113,10 +163,14 @@ export const Navbar: React.FC = () => {
             <select
               aria-label="Select Demo Persona"
               value={activePersonaKey}
-              onChange={(e) => selectPersona(e.target.value)}
+              onChange={(e) =>
+                selectPersona(e.target.value)
+              }
               className="role-dropdown"
             >
+
               <optgroup label="Valid Students">
+
                 <option value="student-a">
                   Student A (Owns rsv_9X8y7Z)
                 </option>
@@ -124,9 +178,11 @@ export const Navbar: React.FC = () => {
                 <option value="student-b">
                   Student B (Owns rsv_Aa1Bb2)
                 </option>
+
               </optgroup>
 
               <optgroup label="Restricted / Elevated">
+
                 <option value="student-limited">
                   Student Limited (rooms:read only)
                 </option>
@@ -134,9 +190,11 @@ export const Navbar: React.FC = () => {
                 <option value="staff-admin">
                   Library Staff / Admin
                 </option>
+
               </optgroup>
 
               <optgroup label="Negative Security Testing">
+
                 <option value="unauthenticated">
                   Anonymous (No Token → 401)
                 </option>
@@ -144,8 +202,11 @@ export const Navbar: React.FC = () => {
                 <option value="malformed">
                   Malformed Token (→ 401)
                 </option>
+
               </optgroup>
+
             </select>
+
           </div>
 
         </div>

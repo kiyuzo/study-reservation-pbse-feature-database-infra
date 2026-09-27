@@ -1,7 +1,14 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, useNavigate, useParams } from 'react-router-dom';
+import {
+  BrowserRouter,
+  Routes,
+  Route,
+  Navigate,
+  useNavigate,
+  useParams
+} from 'react-router-dom';
 
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './components/Toast';
 import { Navbar } from './components/Navbar';
 
@@ -16,7 +23,21 @@ import { ShieldCheck, BookOpen } from 'lucide-react';
 
 const AppContent: React.FC = () => {
   const navigate = useNavigate();
+  const { hasScope } = useAuth();
 
+  /*
+   * Central navigation handler.
+   *
+   * Every page can call:
+   *   onNavigate('dashboard')
+   *   onNavigate('rooms')
+   *   onNavigate('room-detail', roomId)
+   *   onNavigate('reservations')
+   *   onNavigate('security')
+   *   onNavigate('audit')
+   *
+   * React Router is responsible for the actual URL.
+   */
   const handleNavigate = (tab: string, entityId?: string) => {
     switch (tab) {
       case 'dashboard':
@@ -29,7 +50,9 @@ const AppContent: React.FC = () => {
 
       case 'room-detail':
         if (entityId) {
-          navigate(`/rooms/${entityId}`);
+          navigate(`/rooms/${encodeURIComponent(entityId)}`);
+        } else {
+          navigate('/rooms');
         }
         break;
 
@@ -49,8 +72,21 @@ const AppContent: React.FC = () => {
         navigate('/');
     }
 
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    });
   };
+
+  /*
+   * Role / scope based access.
+   *
+   * Backend authorization is still the source of truth.
+   * These checks only control which frontend routes/navigation
+   * are available to the active demo persona.
+   */
+  const canViewReservations = hasScope('reservations:read');
+  const canViewAdminPages = hasScope('admin:manage');
 
   return (
     <div
@@ -63,48 +99,137 @@ const AppContent: React.FC = () => {
     >
       <Navbar />
 
-      <main style={{ flex: 1, padding: '24px 0' }}>
+      <main
+        style={{
+          flex: 1,
+          padding: '24px 0'
+        }}
+      >
         <div className="container">
           <Routes>
+
+            {/* =========================================================
+                DASHBOARD
+                URL: /
+            ========================================================= */}
             <Route
               path="/"
-              element={<Dashboard onNavigate={handleNavigate} />}
+              element={
+                <Dashboard
+                  onNavigate={handleNavigate}
+                />
+              }
             />
 
+            {/* =========================================================
+                STUDY ROOMS
+                URL: /rooms
+            ========================================================= */}
             <Route
               path="/rooms"
-              element={<Rooms onNavigate={handleNavigate} />}
+              element={
+                <Rooms
+                  onNavigate={handleNavigate}
+                />
+              }
             />
 
+            {/* =========================================================
+                ROOM DETAIL
+                URL: /rooms/:roomId
+                Example: /rooms/rm_1a2B3cD
+            ========================================================= */}
             <Route
               path="/rooms/:roomId"
-              element={<RoomDetailRoute onNavigate={handleNavigate} />}
+              element={
+                <RoomDetailRoute
+                  onNavigate={handleNavigate}
+                />
+              }
             />
 
+            {/* =========================================================
+                MY RESERVATIONS
+                URL: /reservations
+
+                Requires reservations:read.
+            ========================================================= */}
             <Route
               path="/reservations"
-              element={<MyReservations onNavigate={handleNavigate} />}
+              element={
+                canViewReservations ? (
+                  <MyReservations
+                    onNavigate={handleNavigate}
+                  />
+                ) : (
+                  <Navigate
+                    to="/"
+                    replace
+                  />
+                )
+              }
             />
 
+            {/* =========================================================
+                SECURITY & ACCESS
+                URL: /security
+
+                Admin/staff only.
+            ========================================================= */}
             <Route
               path="/security"
-              element={<SecurityDemo />}
+              element={
+                canViewAdminPages ? (
+                  <SecurityDemo />
+                ) : (
+                  <Navigate
+                    to="/"
+                    replace
+                  />
+                )
+              }
             />
 
+            {/* =========================================================
+                AUDIT LOGS
+                URL: /audit
+
+                Admin/staff only.
+            ========================================================= */}
             <Route
               path="/audit"
-              element={<AuditDemo />}
+              element={
+                canViewAdminPages ? (
+                  <AuditDemo />
+                ) : (
+                  <Navigate
+                    to="/"
+                    replace
+                  />
+                )
+              }
             />
 
-            {/* Fallback */}
+            {/* =========================================================
+                FALLBACK
+                Unknown URL -> Dashboard
+            ========================================================= */}
             <Route
               path="*"
-              element={<Dashboard onNavigate={handleNavigate} />}
+              element={
+                <Dashboard
+                  onNavigate={handleNavigate}
+                />
+              }
             />
+
           </Routes>
         </div>
       </main>
 
+      {/* =============================================================
+          FOOTER
+      ============================================================= */}
       <footer
         style={{
           borderTop: '1px solid var(--border)',
@@ -125,20 +250,57 @@ const AppContent: React.FC = () => {
             color: 'var(--text-muted)'
           }}
         >
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <BookOpen size={18} color="var(--primary-700)" />
-            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px'
+            }}
+          >
+            <BookOpen
+              size={18}
+              color="var(--primary-700)"
+            />
+
+            <span
+              style={{
+                fontWeight: 600,
+                color: 'var(--text-main)'
+              }}
+            >
               University Library Study Room Reservation System
             </span>
-            <span>&bull; PBSE Feature Step 7–9 Security Layer</span>
+
+            <span>
+              &bull; PBSE Feature Step 7–9 Security Layer
+            </span>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <span style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-              <ShieldCheck size={16} color="var(--accent-amber)" />
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '16px'
+            }}
+          >
+            <span
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px'
+              }}
+            >
+              <ShieldCheck
+                size={16}
+                color="var(--accent-amber)"
+              />
+
               Protected by Token, Scope & Object Checkers
             </span>
-            <span>RFC 9457 Problem Details</span>
+
+            <span>
+              RFC 9457 Problem Details
+            </span>
           </div>
         </div>
       </footer>
@@ -148,12 +310,18 @@ const AppContent: React.FC = () => {
 
 /**
  * Gets roomId directly from the URL:
+ *
  * /rooms/:roomId
+ *
+ * Example:
+ * /rooms/rm_1a2B3cD
  */
 const RoomDetailRoute: React.FC<{
   onNavigate: (tab: string, entityId?: string) => void;
 }> = ({ onNavigate }) => {
-  const { roomId } = useParams<{ roomId: string }>();
+  const { roomId } = useParams<{
+    roomId: string;
+  }>();
 
   return (
     <RoomDetail
