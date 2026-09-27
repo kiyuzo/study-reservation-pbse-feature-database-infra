@@ -48,12 +48,13 @@ Each main workflow has its own URL:
 /reservations           → My Reservations
 /security               → Security & Access
 /audit                  → Audit Logs
+```
 
 ---
 
 ## 📁 Repository Structure
 
-```
+```text
 .
 ├── openapi.yaml                 # The contract (source of truth)
 ├── CHANGELOG.md                 # Contract revisions log
@@ -72,7 +73,7 @@ Each main workflow has its own URL:
 │   │   └── init.js              # Database initialization script
 │   └── src/
 │       ├── app.js               # Express application entrypoint
-│       ├── problem.js           # RFC 9457 error builder & middleware
+│       ├── problem.js            # RFC 9457 error builder & middleware
 │       ├── routes/              # Express route handlers (rooms, reservations)
 │       ├── schemas/             # Request validation logic
 │       ├── store/               # SQL database access layer (rooms, reservations, idempotency)
@@ -128,26 +129,26 @@ Server-side idempotency is implemented in `service/src/store/idempotency.js` usi
 
 The test suite (`tests/idempotency/idempotency.test.js` — 9/9 Passed) verifies the **exact decision tree** mandated by the course specification:
 
-```
-                  Idempotency-Key Header
+```text
+                   Idempotency-Key Header
                            │
-                 [ Validate UUID v4 ]
-                  ├── Invalid / Missing ──> 400 Bad Request (RFC 9457)
-                  └── Valid
+                  [ Validate UUID v4 ]
+                   ├── Invalid / Missing ──> 400 Bad Request (RFC 9457)
+                   └── Valid
                            │
-                     Check Database
+                      Check Database
                            │
-         ┌─────────────────┼─────────────────┐
-         │                 │                 │
-    Never Seen     Already Seen      Already Seen
-         │        (Same Body Hash)  (Different Body)
-         │                 │                 │
-   Process Request   Replay Cached       409 Conflict
-   Save Key+Hash       Response        (idempotency-key-
-   Save 201 Resp           │                 reuse)
-         │                 │
-    201 Created       201 Created
-  (New DB Record)   (Zero DB Inserts)
+          ┌─────────────────┼─────────────────┐
+          │                 │                 │
+     Never Seen       Already Seen      Already Seen
+          │        (Same Body Hash)  (Different Body)
+          │                 │                 │
+    Process Request   Replay Cached       409 Conflict
+    Save Key+Hash       Response        (idempotency-key-
+    Save 201 Resp           │                 reuse)
+          │                 │
+     201 Created       201 Created
+   (New DB Record)   (Zero DB Inserts)
 ```
 
 #### Key Findings from Idempotency Tests:
@@ -176,22 +177,27 @@ The test suite (`tests/idempotency/idempotency.test.js` — 9/9 Passed) verifies
    cd service
    npm install
    ```
+
 2. Copy environment variables:
    ```bash
    cp .env.example .env
    ```
+
 3. Initialize SQLite database:
    ```bash
    npm run db:init
    ```
+
 4. Run full test suite:
    ```bash
    npm test
    ```
+
 5. Run dev server:
    ```bash
    npm run dev
    ```
+
 6. Verify health endpoint:
    ```bash
    curl http://localhost:8080/health
