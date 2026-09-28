@@ -300,7 +300,7 @@ The entire Study Room Reservation System is deployed and publicly accessible **u
   - **Backend REST API:** [https://study-reservation-pbse-feature-data-five.vercel.app/v1/rooms](https://study-reservation-pbse-feature-data-five.vercel.app/v1/rooms)
   - **API Documentation:** [https://study-reservation-pbse-feature-data-five.vercel.app/docs](https://study-reservation-pbse-feature-data-five.vercel.app/docs)
 
-*Note: Dedicated standalone frontend alias (https://study-reservation-pbse-feature-data-five.vercel.app mintol attach ni jg han di our girthub repo) remains active as an alternate endpoint.*
+*Note: Dedicated standalone frontend alias (https://study-reservation-pbse-feature-data-five.vercel.app) remains active as an alternate endpoint.*
 
 ### Database Infrastructure
 - **Database Engine:** SQLite (via `sql.js` WASM on Vercel Serverless with binary disk export/reload; `better-sqlite3` native driver for local test execution).
