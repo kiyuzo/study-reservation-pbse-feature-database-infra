@@ -4,7 +4,7 @@ A contract-first study room reservation backend system built for Platform-Based 
 
 ---
 
-## 🏛️ System Overview
+## System Overview
 
 A student checks the availability of study rooms in the library on a given date and time. They select an available room and reserve it. An automated cleanup job periodically checks if reserved rooms have been occupied (via check-in); if a student doesn't check in within 15 minutes, the job cancels the reservation. A room display screen outside each room shows the current reservation status and allows students to check in. If a student tries to reserve a room that was just booked by someone else a second ago, the reservation fails.
 
@@ -98,7 +98,7 @@ Each main workflow has its own URL:
 
 ---
 
-## 🧪 Test Results
+## Test Results
 
 | Test Suite | Result |
 | :--- | :--- |
@@ -128,7 +128,7 @@ The server stores the key and request-body hash in SQLite to ensure:
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
 1. Install dependencies:
    ```bash
@@ -163,7 +163,7 @@ The server stores the key and request-body hash in SQLite to ensure:
 
 ---
 
-## 🔄 Conditional Requests
+## Conditional Requests
 
 ### Conditional Reads (A.7)
 - **Mechanism:** HTTP `ETag` + `If-None-Match` + `304 Not Modified`.
@@ -194,7 +194,7 @@ The server stores the key and request-body hash in SQLite to ensure:
 
 ---
 
-## 🛡️ Authorization Testing (A.9 Console Attack)
+## Authorization Testing (A.9 Console Attack)
 
 The assignment requires verifying that hiding UI buttons does not constitute security. All authorizations are strictly enforced on the server.
 
@@ -238,7 +238,7 @@ fetch("https://study-reservation-pbse-feature-data-five.vercel.app/v1/reservatio
 
 ---
 
-## 🌐 Production Deployment (Unified Full Stack)
+## Production Deployment (Unified Full Stack)
 
 The entire Study Room Reservation System is deployed and publicly accessible **under the same unified link**, hosting both the Frontend UI and Backend REST API on a single origin.
 
