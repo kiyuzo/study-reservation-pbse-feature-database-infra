@@ -275,7 +275,7 @@ fetch("https://study-reservation-pbse-feature-data-five.vercel.app/v1/reservatio
 }).then(r => r.json()).then(console.log);
 ```
 
-### A.9 Authorization Test Report
+### Authorization Test Report
 | Scenario | Account / Actor | Operation Attempted | Expected Status | Observed Status | Result |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | **Layer 1: Unauthenticated** | Anonymous (No token) | `GET /v1/reservations/rsv_9X8y7Z` | `401 Unauthorized` | `401 Unauthorized` | **PASS** |
