@@ -58,7 +58,7 @@ Each main workflow has its own URL:
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
 .
