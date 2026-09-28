@@ -1,0 +1,378 @@
+{
+  "realm": "study-reservation",
+  "enabled": true,
+  "displayName": "Study Room Reservation",
+  "sslRequired": "external",
+  "registrationAllowed": false,
+  "loginWithEmailAllowed": true,
+  "duplicateEmailsAllowed": false,
+  "resetPasswordAllowed": false,
+  "editUsernameAllowed": false,
+  "revokeRefreshToken": true,
+  "refreshTokenMaxReuse": 0,
+  "accessTokenLifespan": 300,
+  "ssoSessionIdleTimeout": 1800,
+  "ssoSessionMaxLifespan": 36000,
+  "roles": {
+    "realm": [
+      {
+        "name": "student",
+        "description": "Student actor"
+      },
+      {
+        "name": "display",
+        "description": "Room display device actor"
+      }
+    ]
+  },
+  "clientScopes": [
+    {
+      "name": "rooms:read",
+      "description": "Browse rooms and room details",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Browse rooms and room details"
+      }
+    },
+    {
+      "name": "reservations:read",
+      "description": "Read reservations visible to the principal",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Read reservations visible to you"
+      }
+    },
+    {
+      "name": "reservations:write",
+      "description": "Create and cancel own reservations",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Create and cancel your reservations"
+      }
+    },
+    {
+      "name": "rooms:display",
+      "description": "Sync schedule / status for an assigned room",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Sync room display schedule"
+      }
+    },
+    {
+      "name": "reservations:checkin",
+      "description": "Check a reservation in at a room",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "true",
+        "consent.screen.text": "Check in at a room"
+      }
+    },
+    {
+      "name": "reservations:cleanup",
+      "description": "Mark abandoned reservations (e.g. no-show)",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "true",
+        "display.on.consent.screen": "false"
+      }
+    },
+    {
+      "name": "study-reservation-api-audience",
+      "description": "Adds aud claim for the Study Reservation API",
+      "protocol": "openid-connect",
+      "attributes": {
+        "include.in.token.scope": "false",
+        "display.on.consent.screen": "false"
+      },
+      "protocolMappers": [
+        {
+          "name": "audience-study-reservation-api",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "study-reservation-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
+        },
+        {
+          "name": "sub",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-sub-mapper",
+          "consentRequired": false,
+          "config": {
+            "access.token.claim": "true",
+            "id.token.claim": "true",
+            "introspection.token.claim": "true",
+            "userinfo.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "web-client",
+      "name": "Web client (Session 5)",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": [
+        "http://localhost:3000/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3000"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256",
+        "oauth2.device.authorization.grant.enabled": "false"
+      },
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "study-reservation-api-audience"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "rooms:read",
+        "reservations:read",
+        "reservations:write"
+      ]
+    },
+    {
+      "clientId": "mobile-client",
+      "name": "Mobile client (Session 6)",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": [
+        "http://localhost:3001/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3001"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "study-reservation-api-audience"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "rooms:read",
+        "reservations:read",
+        "reservations:write"
+      ]
+    },
+    {
+      "clientId": "room-display",
+      "name": "Room Display (IoT)",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": [
+        "http://localhost:3002/callback"
+      ],
+      "webOrigins": [
+        "http://localhost:3002"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "study-reservation-api-audience"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "rooms:read",
+        "reservations:read",
+        "rooms:display",
+        "reservations:checkin"
+      ]
+    },
+    {
+      "clientId": "cleanup-job",
+      "name": "Cleanup job (confidential)",
+      "enabled": true,
+      "publicClient": false,
+      "secret": "local-dev-cleanup-job-secret",
+      "redirectUris": [],
+      "webOrigins": [],
+      "standardFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": true,
+      "protocol": "openid-connect",
+      "fullScopeAllowed": false,
+      "optionalClientScopes": [
+        "reservations:cleanup"
+      ],
+      "defaultClientScopes": [
+        "study-reservation-api-audience"
+      ]
+    },
+    {
+      "clientId": "test-cli",
+      "name": "Dev-only password grant (Step 3 checkpoint)",
+      "description": "Not a product client. Direct access grants for local token inspection only.",
+      "enabled": true,
+      "publicClient": true,
+      "redirectUris": [
+        "http://localhost/*"
+      ],
+      "webOrigins": [
+        "+"
+      ],
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "serviceAccountsEnabled": false,
+      "attributes": {
+        "pkce.code.challenge.method": "S256"
+      },
+      "protocol": "openid-connect",
+      "fullScopeAllowed": true,
+      "defaultClientScopes": [
+        "study-reservation-api-audience"
+      ],
+      "optionalClientScopes": [
+        "offline_access",
+        "rooms:read",
+        "reservations:read",
+        "reservations:write",
+        "rooms:display",
+        "reservations:checkin",
+        "reservations:cleanup"
+      ]
+    }
+  ],
+  "users": [
+    {
+      "username": "student-a",
+      "enabled": true,
+      "email": "student-a@study-reservation.local",
+      "emailVerified": true,
+      "firstName": "Student",
+      "lastName": "A",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "changeme-test",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "student"
+      ]
+    },
+    {
+      "username": "student-b",
+      "enabled": true,
+      "email": "student-b@study-reservation.local",
+      "emailVerified": true,
+      "firstName": "Student",
+      "lastName": "B",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "changeme-test",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "student"
+      ]
+    },
+    {
+      "username": "student-c",
+      "enabled": true,
+      "email": "student-c@study-reservation.local",
+      "emailVerified": true,
+      "firstName": "Student",
+      "lastName": "C",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "changeme-test",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "student"
+      ]
+    },
+    {
+      "username": "student-d",
+      "enabled": true,
+      "email": "student-d@study-reservation.local",
+      "emailVerified": true,
+      "firstName": "Student",
+      "lastName": "D",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "changeme-test",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "student"
+      ]
+    },
+    {
+      "username": "display-a",
+      "enabled": true,
+      "email": "display-a@study-reservation.local",
+      "emailVerified": true,
+      "firstName": "Display",
+      "lastName": "A",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "changeme-test",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "display"
+      ]
+    },
+    {
+      "username": "display-b",
+      "enabled": true,
+      "email": "display-b@study-reservation.local",
+      "emailVerified": true,
+      "firstName": "Display",
+      "lastName": "B",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "changeme-test",
+          "temporary": false
+        }
+      ],
+      "realmRoles": [
+        "display"
+      ]
+    }
+  ]
+}

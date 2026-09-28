@@ -1,0 +1,754 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Study Reservation API — Interactive Documentation</title>
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23ea580c'><path d='M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14h2v2h-2zm0-10h2v8h-2z'/></svg>">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui.css">
+  <style>
+    :root {
+      --brand-orange: #ea580c;
+      --brand-orange-light: #f97316;
+      --brand-orange-dark: #c2410c;
+      --brand-orange-gradient: linear-gradient(135deg, #fb923c 0%, #ea580c 45%, #c2410c 100%);
+      --bg-light: #f8fafc;
+      --border-color: #e2e8f0;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-light);
+      color: var(--text-main);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    /* Top Navigation Bar */
+    .top-nav {
+      height: 64px;
+      background: #ffffff;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 40px;
+      position: sticky;
+      top: 0;
+      z-index: 1000;
+      box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+    }
+
+    .brand-container {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+    }
+
+    .brand-icon {
+      width: 34px;
+      height: 34px;
+      background: var(--brand-orange-gradient);
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #ffffff;
+      box-shadow: 0 4px 10px rgba(234, 88, 12, 0.3);
+    }
+
+    .brand-title {
+      font-size: 19px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      color: #0f172a;
+    }
+
+    .brand-title span {
+      color: var(--brand-orange);
+      margin-left: 4px;
+    }
+
+    .nav-badges {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .version-pill {
+      background: #ffedd5;
+      color: #c2410c;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: 6px;
+      letter-spacing: 0.5px;
+    }
+
+    .method-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .badge-get { background: #dbeafe; color: #1d4ed8; }
+    .badge-post { background: #dcfce7; color: #15803d; }
+    .badge-patch { background: #ffedd5; color: #c2410c; }
+    .badge-delete { background: #ffe4e6; color: #be123c; }
+
+    /* Hero Banner — Vibrant Orange */
+    .hero-banner {
+      background: var(--brand-orange-gradient);
+      color: #ffffff;
+      padding: 56px 48px 64px 48px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-banner::before {
+      content: '';
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0) 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .hero-content {
+      max-width: 1240px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-breadcrumb {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.9);
+      margin-bottom: 14px;
+    }
+
+    .hero-title {
+      font-size: 42px;
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -1px;
+      margin-bottom: 16px;
+      color: #ffffff;
+    }
+
+    .hero-desc {
+      font-size: 16px;
+      line-height: 1.6;
+      max-width: 820px;
+      color: rgba(255, 255, 255, 0.95);
+      margin-bottom: 40px;
+      font-weight: 400;
+    }
+
+    .hero-stats {
+      display: flex;
+      align-items: center;
+      gap: 36px;
+      border-top: 1px solid rgba(255, 255, 255, 0.25);
+      padding-top: 28px;
+    }
+
+    .stat-item {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      position: relative;
+    }
+
+    .stat-item:not(:last-child)::after {
+      content: '';
+      position: absolute;
+      right: -18px;
+      top: 15%;
+      height: 70%;
+      width: 1px;
+      background: rgba(255, 255, 255, 0.3);
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      line-height: 1;
+    }
+
+    .stat-label {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1px;
+      text-transform: uppercase;
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    /* Main Card Container */
+    .main-container {
+      max-width: 1240px;
+      margin: -24px auto 60px auto;
+      padding: 0 20px;
+      position: relative;
+      z-index: 10;
+    }
+
+    .api-card {
+      background: #ffffff;
+      border-radius: 16px;
+      border: 1px solid var(--border-color);
+      box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.06), 0 8px 10px -6px rgba(0, 0, 0, 0.04);
+      padding: 32px 36px;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid #f1f5f9;
+    }
+
+    .card-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 8px;
+    }
+
+    .card-title {
+      font-size: 26px;
+      font-weight: 800;
+      color: #0f172a;
+      letter-spacing: -0.5px;
+    }
+
+    .tag-oas {
+      background: #16a34a;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 5px;
+    }
+
+    .tag-ver {
+      background: #f1f5f9;
+      color: #475569;
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 5px;
+      border: 1px solid #cbd5e1;
+    }
+
+    .spec-links {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 13px;
+      margin-bottom: 12px;
+    }
+
+    .spec-links a {
+      color: #2563eb;
+      text-decoration: none;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .spec-links a:hover {
+      text-decoration: underline;
+    }
+
+    .card-desc {
+      color: var(--text-muted);
+      font-size: 14.5px;
+      line-height: 1.6;
+      max-width: 820px;
+    }
+
+    .auth-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: #ffffff;
+      border: 1.5px solid #10b981;
+      color: #059669;
+      font-weight: 700;
+      font-size: 13px;
+      padding: 10px 20px;
+      border-radius: 8px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    }
+
+    .auth-btn:hover {
+      background: #ecfdf5;
+      border-color: #059669;
+      transform: translateY(-1px);
+    }
+
+    /* Modal for Authorize */
+    .modal-backdrop {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(15, 23, 42, 0.6);
+      backdrop-filter: blur(4px);
+      z-index: 2000;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .modal-backdrop.active {
+      display: flex;
+    }
+
+    .modal-box {
+      background: #ffffff;
+      width: 90%;
+      max-width: 520px;
+      border-radius: 16px;
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+      overflow: hidden;
+    }
+
+    .modal-header {
+      background: #f8fafc;
+      padding: 18px 24px;
+      border-bottom: 1px solid var(--border-color);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .modal-header h3 {
+      font-size: 17px;
+      font-weight: 700;
+      color: #0f172a;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #64748b;
+    }
+
+    .modal-body {
+      padding: 24px;
+    }
+
+    .modal-field {
+      margin-bottom: 18px;
+    }
+
+    .modal-field label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      color: #334155;
+      margin-bottom: 6px;
+    }
+
+    .modal-field input {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 8px;
+      border: 1px solid var(--border-color);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+    }
+
+    .modal-field small {
+      display: block;
+      color: #64748b;
+      font-size: 12px;
+      margin-top: 5px;
+    }
+
+    .modal-footer {
+      padding: 16px 24px;
+      background: #f8fafc;
+      border-top: 1px solid var(--border-color);
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+    }
+
+    .btn-save {
+      background: var(--brand-orange);
+      color: #ffffff;
+      border: none;
+      padding: 9px 18px;
+      border-radius: 7px;
+      font-weight: 700;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    .btn-save:hover {
+      background: var(--brand-orange-dark);
+    }
+
+    .btn-cancel {
+      background: #ffffff;
+      color: #475569;
+      border: 1px solid var(--border-color);
+      padding: 9px 16px;
+      border-radius: 7px;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+    }
+
+    /* Swagger UI Overrides */
+    .swagger-ui .wrapper {
+      padding: 0 !important;
+      max-width: 100% !important;
+    }
+
+    .swagger-ui .topbar {
+      display: none !important;
+    }
+
+    .swagger-ui .information-container {
+      display: none !important;
+    }
+
+    .swagger-ui .scheme-container {
+      display: none !important;
+    }
+
+    .swagger-ui .filter-container {
+      padding: 16px 0 !important;
+      margin-bottom: 12px !important;
+    }
+
+    .swagger-ui .filter-container .operation-filter-input {
+      border: 1.5px solid #cbd5e1 !important;
+      border-radius: 8px !important;
+      padding: 11px 16px !important;
+      font-size: 14px !important;
+      font-family: inherit !important;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04) !important;
+      transition: all 0.2s ease !important;
+      width: 100% !important;
+      max-width: 100% !important;
+    }
+
+    .swagger-ui .filter-container .operation-filter-input:focus {
+      border-color: var(--brand-orange) !important;
+      outline: none !important;
+      box-shadow: 0 0 0 3px rgba(234, 88, 12, 0.15) !important;
+    }
+
+    .swagger-ui .opblock-tag-section {
+      margin-bottom: 24px !important;
+    }
+
+    .swagger-ui .opblock-tag {
+      font-size: 19px !important;
+      font-weight: 800 !important;
+      color: #0f172a !important;
+      padding: 14px 0 !important;
+      border-bottom: 1.5px solid #e2e8f0 !important;
+      font-family: inherit !important;
+    }
+
+    .swagger-ui .opblock-tag small {
+      font-size: 13px !important;
+      font-weight: 500 !important;
+      color: #64748b !important;
+      margin-left: 12px !important;
+    }
+
+    .swagger-ui .opblock {
+      border-radius: 10px !important;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02) !important;
+      margin: 0 0 12px 0 !important;
+      border-width: 1.5px !important;
+    }
+
+    .swagger-ui .opblock .opblock-summary {
+      padding: 12px 18px !important;
+    }
+
+    .swagger-ui .opblock.opblock-get {
+      border-color: #bfdbfe !important;
+      background: rgba(239, 246, 255, 0.5) !important;
+    }
+    .swagger-ui .opblock.opblock-get .opblock-summary-method {
+      background: #2563eb !important;
+      border-radius: 6px !important;
+      font-weight: 700 !important;
+      font-size: 12px !important;
+    }
+
+    .swagger-ui .opblock.opblock-post {
+      border-color: #bbf7d0 !important;
+      background: rgba(240, 253, 244, 0.5) !important;
+    }
+    .swagger-ui .opblock.opblock-post .opblock-summary-method {
+      background: #16a34a !important;
+      border-radius: 6px !important;
+      font-weight: 700 !important;
+      font-size: 12px !important;
+    }
+
+    .swagger-ui .opblock-summary-path {
+      font-family: 'JetBrains Mono', monospace !important;
+      font-size: 14px !important;
+      font-weight: 600 !important;
+      color: #0f172a !important;
+    }
+
+    .swagger-ui .opblock-summary-description {
+      font-size: 13px !important;
+      color: #64748b !important;
+    }
+
+    .swagger-ui .btn.execute {
+      background-color: var(--brand-orange) !important;
+      border-color: var(--brand-orange) !important;
+      color: #ffffff !important;
+      border-radius: 6px !important;
+      font-weight: 700 !important;
+    }
+
+    .swagger-ui .btn.execute:hover {
+      background-color: var(--brand-orange-dark) !important;
+    }
+
+    .swagger-ui .btn.try-out__btn {
+      border-radius: 6px !important;
+      font-weight: 600 !important;
+    }
+
+    .swagger-ui table {
+      border-radius: 8px !important;
+      overflow: hidden !important;
+    }
+
+    /* Footer */
+    .docs-footer {
+      text-align: center;
+      padding: 30px 20px;
+      color: #94a3b8;
+      font-size: 13px;
+      border-top: 1px solid var(--border-color);
+      background: #ffffff;
+    }
+
+    .docs-footer a {
+      color: #64748b;
+      text-decoration: none;
+      font-weight: 600;
+    }
+
+    .docs-footer a:hover {
+      color: var(--brand-orange);
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Top Navigation Bar -->
+  <nav class="top-nav">
+    <a href="#" class="brand-container">
+      <div class="brand-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"></path>
+          <path d="M6 6h10"></path>
+          <path d="M6 10h10"></path>
+        </svg>
+      </div>
+      <div class="brand-title">STUDY RESERVATION<span>API</span></div>
+    </a>
+    <div class="nav-badges">
+      <span class="version-pill">V0.1.0</span>
+      <span class="method-badge badge-get">GET</span>
+      <span class="method-badge badge-post">POST</span>
+      <span class="method-badge badge-patch">PATCH</span>
+      <span class="method-badge badge-delete">DELETE</span>
+    </div>
+  </nav>
+
+  <!-- Hero Banner — Vibrant Orange -->
+  <header class="hero-banner">
+    <div class="hero-content">
+      <div class="hero-breadcrumb">REST API · OPENAPI 3.1</div>
+      <h1 class="hero-title">Study Reservation Core API</h1>
+      <p class="hero-desc">
+        Backend sistem reservasi study room perpustakaan berbasis contract-first. Menegakkan validasi RFC 9457 Problem Details (application/problem+json), server-side idempotency 24 jam dengan database SQLite, dan penjaminan state machine transition lifecycle.
+      </p>
+      <div class="hero-stats">
+        <div class="stat-item">
+          <span class="stat-value">7</span>
+          <span class="stat-label">Endpoints</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">3</span>
+          <span class="stat-label">Tag Grup</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">100%</span>
+          <span class="stat-label">Contract Pass</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-value">RFC 9457</span>
+          <span class="stat-label">Problem Details</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main API Explorer Card -->
+  <main class="main-container">
+    <div class="api-card">
+      <div class="card-header">
+        <div>
+          <div class="card-title-wrap">
+            <h2 class="card-title">Study Reservation Core API</h2>
+            <span class="tag-ver">0.1.0</span>
+            <span class="tag-oas">OAS 3.1</span>
+          </div>
+          <div class="spec-links">
+            <a href="/openapi.json" target="_blank">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              ./openapi.json
+            </a>
+            <a href="/openapi.yaml" target="_blank">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              ./openapi.yaml
+            </a>
+          </div>
+          <p class="card-desc">
+            Sistem reservasi ruang belajar mandiri dan kelompok. Menyediakan inspeksi ketersediaan ruangan, pemesanan consequential yang aman dari double booking melalui header Idempotency-Key, serta pembatalan dengan model sub-resource state transition.
+          </p>
+        </div>
+        <div>
+          <button class="auth-btn" id="openAuthModal">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+              <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+              <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+            </svg>
+            Authorize
+          </button>
+        </div>
+      </div>
+
+      <!-- Swagger UI Mount Point -->
+      <div id="swagger-ui"></div>
+    </div>
+  </main>
+
+  <!-- Authorize Modal -->
+  <div class="modal-backdrop" id="authModal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <h3>API Configuration & Headers</h3>
+        <button class="modal-close" id="closeAuthModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-field">
+          <label>Default Idempotency-Key (UUID v4)</label>
+          <input type="text" id="customIdempotencyKey" placeholder="0f7c1b9e-3d21-4a6f-9c05-8e2b7d41a9f0">
+          <small>Otomatis disisipkan pada header permintaan POST /v1/reservations untuk pengujian live.</small>
+        </div>
+        <div class="modal-field">
+          <label>API Base Server URL</label>
+          <input type="text" id="customBaseUrl" value="" placeholder="http://localhost:8080">
+          <small>URL endpoint target untuk console Try It Out.</small>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn-cancel" id="cancelAuthModal">Cancel</button>
+        <button class="btn-save" id="saveAuthModal">Save & Apply</button>
+      </div>
+    </div>
+  </div>
+
+  <footer class="docs-footer">
+    <p>Platform-Based Software Engineering (PBSE Week 3) · Study Room Reservation API</p>
+    <p style="margin-top: 6px;">Conforms to OpenAPI 3.1.0 & RFC 9457 Problem Details specification</p>
+  </footer>
+
+  <!-- Swagger UI Scripts -->
+  <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-bundle.js"></script>
+  <script src="https://unpkg.com/swagger-ui-dist@5.11.0/swagger-ui-standalone-preset.js"></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      let savedIdempotencyKey = localStorage.getItem('pbse_idempotency_key') || crypto.randomUUID();
+      document.getElementById('customIdempotencyKey').value = savedIdempotencyKey;
+      document.getElementById('customBaseUrl').value = window.location.origin;
+
+      const ui = SwaggerUIBundle({
+        url: '/openapi.json',
+        dom_id: '#swagger-ui',
+        deepLinking: true,
+        presets: [
+          SwaggerUIBundle.presets.apis,
+          SwaggerUIStandalonePreset
+        ],
+        layout: "BaseLayout",
+        filter: true,
+        showExtensions: true,
+        showCommonExtensions: true,
+        displayRequestDuration: true,
+        docExpansion: "list",
+        defaultModelsExpandDepth: 2,
+        defaultModelExpandDepth: 2,
+        requestInterceptor: (req) => {
+          if (savedIdempotencyKey && req.method === 'POST' && req.url.includes('/reservations')) {
+            if (!req.headers['Idempotency-Key']) {
+              req.headers['Idempotency-Key'] = savedIdempotencyKey;
+            }
+          }
+          return req;
+        }
+      });
+
+      window.ui = ui;
+
+      // Modal Handlers
+      const modal = document.getElementById('authModal');
+      document.getElementById('openAuthModal').onclick = () => modal.classList.add('active');
+      document.getElementById('closeAuthModal').onclick = () => modal.classList.remove('active');
+      document.getElementById('cancelAuthModal').onclick = () => modal.classList.remove('active');
+      document.getElementById('saveAuthModal').onclick = () => {
+        savedIdempotencyKey = document.getElementById('customIdempotencyKey').value.trim();
+        localStorage.setItem('pbse_idempotency_key', savedIdempotencyKey);
+        modal.classList.remove('active');
+        alert('Configuration saved! Headers will be injected during interactive testing.');
+      };
+    });
+  </script>
+</body>
+</html>

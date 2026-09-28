@@ -1,0 +1,499 @@
+# =====================================================================
+#  STARTER SKELETON — Meeting 2, Lab L2
+#
+#  This file lints clean as it stands. That is its only purpose: to
+#  prove your toolchain works before you have anything to lose.
+#
+#  Every line marked TODO is yours to replace with YOUR TEAM'S DOMAIN.
+#  Do not submit a file that still says "Thing". A specification that
+#  still contains this skeleton's nouns has not been done.
+#
+#  Work through 02-lab-L2-at-home.md alongside this file.
+# =====================================================================
+
+openapi: 3.1.0
+
+info:
+  title: Library Study Room Reservation API
+  version: 0.1.0
+  description: |
+    A student checks the availability of study rooms in the library on a given date and time. They select an available room and reserve it. An automated cleanup job periodically checks if reserved rooms have been occupied (via check-in); if a student doesn't check in within 15 minutes, the job cancels the reservation. A room display screen outside each room shows the current reservation status and allows students to check in. If a student tries to reserve a room that was just booked by someone else a second ago, the reservation fails.
+
+    ## Conventions
+
+    All monetary amounts are integers in the minor unit of the stated
+    currency; the currency is carried explicitly beside every amount.
+    All timestamps are RFC 3339 with an explicit UTC offset, for
+    example 2026-03-04T12:10:04+07:00.
+
+    Clients MUST ignore unknown response fields. Clients MUST treat an
+    unrecognised enumeration value as the nearest non-terminal state
+    and MUST NOT crash on it. These two sentences are what make every
+    additive change to this interface legal.
+
+    ## Idempotency
+
+    Idempotency-Key, a version-4 UUID with hyphens. Required on POST /v1/reservations. Ignored everywhere else. Keys are kept for 24 hours. A key reused after that is treated as new. 409 Conflict with type .../problems/idempotency-key-reuse if contents differ.
+
+    ## State machine
+
+    - pending_checkin -> checked_in
+    - pending_checkin -> cancelled
+    - pending_checkin -> no_show
+    - checked_in -> completed
+
+    Any pair of statuses not listed there is illegal and returns 409 illegal-transition.
+
+servers:
+  - url: https://api.example.com/v1
+    description: Production — does not exist yet. That is Meeting 3.
+  - url: http://localhost:8080/v1
+    description: Local development
+
+tags:
+  - name: system
+    description: System infrastructure and service health checks.
+
+  - name: Reservations
+    description: Library study room reservations.
+
+  - name: Rooms
+    description: Library study rooms.
+
+paths:
+  /health:
+    get:
+      operationId: getHealth
+      summary: Health
+      tags: [system]
+      description: |
+        Health check endpoint. Always returns 200 without checking external dependencies (Assignment A.10).
+      responses:
+        '200':
+          description: Service is healthy.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, description, version, timestamp]
+                properties:
+                  status:
+                    type: string
+                    example: pass
+                  description:
+                    type: string
+                    example: Study Room Reservation API service is healthy
+                  version:
+                    type: string
+                    example: 0.1.0
+                  timestamp:
+                    type: string
+                    example: '2026-09-08T10:00:00.000Z'
+
+  /rooms:
+   get:
+    operationId: listRooms
+    summary: List study rooms
+    tags: [Rooms]
+    description: Lists all study rooms available in the library.
+    responses:
+      '200':
+        description: A collection of study rooms.
+        content:
+          application/json:
+            schema:
+              type: array
+              items:
+                $ref: '#/components/schemas/Room'
+      '400':
+        $ref: '#/components/responses/BadRequest'
+
+  /rooms/{roomId}:
+    parameters:
+      - name: roomId
+        in: path
+        required: true
+        description: Opaque, server-generated study room identifier.
+        schema:
+          type: string
+          pattern: '^rm_[A-Za-z0-9]{3,}$'
+        example: rm_1a2B3cD
+    get:
+      operationId: getRoom
+      summary: Fetch one study room
+      tags: [Rooms]
+      responses:
+        '200':
+          description: The study room.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Room'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # -------------------------------------------------------------------
+  # A collection GET with a filter parameter. Required for L2.
+  # Rule 2: removing a query parameter must give you MORE results of the
+  # same kind, never a DIFFERENT kind of thing.
+  # -------------------------------------------------------------------
+  /reservations:
+    get:
+      operationId: listReservations
+      summary: List reservations
+      tags: [Reservations]
+      description: |
+        Lists the user's reservations. Cancelled and completed reservations appear in the list, so that clients can display them appropriately in history views rather than silently omitting them.
+      parameters:
+        - name: status
+          in: query
+          required: false
+          description: Filter to reservations in one status.
+          schema:
+            type: string
+            enum: [pending_checkin, checked_in, cancelled, no_show, completed]
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of items to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+        - name: cursor
+          in: query
+          required: false
+          description: Opaque cursor from a previous page's nextCursor.
+          schema: { type: string }
+      responses:
+        '200':
+          description: A page of reservations.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items: { $ref: '#/components/schemas/Reservation' }
+                  nextCursor:
+                    type: string
+                    description: Absent on the last page.
+                    example: eyJvIjoyMH0
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+    # -----------------------------------------------------------------
+    # The unsafe, consequential operation. Required for L2.
+    # The idempotency key is declared REQUIRED, so it is impossible to
+    # read this document and not know about it.
+    # -----------------------------------------------------------------
+    post:
+      operationId: createReservation
+      summary: Create a reservation
+      tags: [Reservations]
+      description: |
+        Creates a new room reservation. This is the consequential operation that must not happen twice, because it locks the availability of the room.
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema:
+            type: string
+            format: uuid
+          example: 0f7c1b9e-3d21-4a6f-9c05-8e2b7d41a9f0
+          description: |
+            Generated by the client at the moment the user confirms the
+            action, and reused unchanged for every retry of that same
+            intent. Retained 24 hours. Reuse with a different body
+            returns 409 idempotency-key-reuse.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/NewReservation' }
+      responses:
+        '201':
+          description: |
+            Created — or, on a retry with the same key and the same
+            body, the replayed original response.
+          headers:
+            Location:
+              description: URI of the created reservation.
+              schema: { type: string }
+              example: /v1/reservations/rsv_9X8y7Z
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reservation' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/UnprocessableEntity' }
+
+  /reservations/{reservationId}:
+    parameters:
+      - name: reservationId
+        in: path
+        required: true
+        description: Opaque, server-generated. Never a database integer.
+        schema:
+          type: string
+          pattern: '^rsv_[A-Za-z0-9]{3,}$'
+        example: rsv_9X8y7Z
+    get:
+      operationId: getReservation
+      summary: Fetch one reservation
+      tags: [Reservations]
+      responses:
+        '200':
+          description: The reservation.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Reservation' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # -------------------------------------------------------------------
+  # Rule 5 — a state transition is a sub-resource, and its URI is a
+  # NOUN. Not /markRetired, not PATCH {"status":"retired"}.
+  # -------------------------------------------------------------------
+  /reservations/{reservationId}/cancellation:
+    parameters:
+      - name: reservationId
+        in: path
+        required: true
+        schema: { type: string }
+        example: rsv_9X8y7Z
+    post:
+      operationId: cancelReservation
+      summary: Cancel a reservation
+      tags: [Reservations]
+      description: |
+        Cancels a pending reservation. Note that the transition carries a
+        body of its own (the reason), a response of its own (who and
+        when), and can be read back later with GET — none of which a
+        verb in the URI would give you.
+
+        Re-sending this when the reservation is ALREADY cancelled returns 200
+        with the existing record, not 409. The requested end state
+        already holds and the caller's intent has been satisfied.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [reason]
+              properties:
+                reason:
+                  type: string
+                  example: Changed my mind
+      responses:
+        '200':
+          description: Already cancelled. The existing record is returned.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cancellation' }
+        '201':
+          description: Cancelled.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Cancellation' }
+        '409':
+          description: |
+            The transition is not permitted from the current status.
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+              example:
+                type: https://api.library.example/problems/illegal-transition
+                title: That status change is not permitted
+                status: 409
+                detail: rsv_9X8y7Z is checked_in; cancellation is refused.
+                instance: /v1/reservations/rsv_9X8y7Z/cancellation
+                from: checked_in
+                to: cancelled
+                allowedFrom: [pending_checkin]
+
+components:
+
+  schemas:
+    Room:
+      type: object
+      required: [id, name, capacity, location, createdAt]
+      properties:
+        id:
+          type: string
+          pattern: '^rm_[A-Za-z0-9]{3,}$'
+          description: Opaque, server-generated, stable forever.
+          example: rm_1a2B3cD
+        name:
+          type: string
+          example: Discussion Room 1
+        capacity:
+          type: integer
+          minimum: 1
+          example: 6
+        location:
+          type: string
+          example: Library 2nd Floor
+        createdAt:
+          type: string
+          format: date-time
+          description: RFC 3339 with an explicit offset.
+          example: '2026-08-30T10:00:00+07:00'
+
+    # ---------------------------------------------------------------
+    # TODO: replace with your resources from Worksheet W1. You need at
+    # least THREE, each with a required array and an example on EVERY
+    # property. A blank example is what the Meeting 7 partner team
+    # will complain about.
+    # ---------------------------------------------------------------
+    Reservation:
+      type: object
+      required: [id, roomId, status, createdAt]
+      properties:
+        id:
+          type: string
+          pattern: '^rsv_[A-Za-z0-9]{3,}$'
+          description: Opaque, server-generated, stable forever.
+          example: rsv_9X8y7Z
+        roomId:
+          type: string
+          example: rm_1a2B3cD
+        status:
+          type: string
+          description: |
+            Clients MUST treat an unrecognised value as 'pending_checkin'
+            and MUST NOT crash on it.
+          enum: [pending_checkin, checked_in, cancelled, no_show, completed]
+          example: pending_checkin
+        createdAt:
+          type: string
+          format: date-time
+          description: RFC 3339 with an explicit offset.
+          example: '2026-08-30T12:10:04+07:00'
+
+    NewReservation:
+      type: object
+      required: [roomId, date, startTime, endTime]
+      properties:
+        roomId:
+          type: string
+          example: rm_1a2B3cD
+        date:
+          type: string
+          example: '2026-08-31'
+        startTime:
+          type: string
+          example: '14:00'
+        endTime:
+          type: string
+          example: '16:00'
+
+    Cancellation:
+      type: object
+      required: [reservationId, reason, cancelledAt]
+      properties:
+        reservationId:
+          type: string
+          example: rsv_9X8y7Z
+        reason:
+          type: string
+          example: Changed my mind
+        cancelledAt:
+          type: string
+          format: date-time
+          example: '2026-08-30T12:14:00+07:00'
+
+    # ---------------------------------------------------------------
+    # RFC 9457 Problem Details. Defined ONCE, referenced everywhere,
+    # so that a client able to parse one of your errors can parse all
+    # of them. Extension members go alongside these five.
+    # ---------------------------------------------------------------
+    Problem:
+      type: object
+      required: [type, title, status]
+      # RFC 9457 permits EXTENSION MEMBERS: your own fields alongside the
+      # five below. They are what turns a merely correct error into an
+      # interface a client can build a good experience on, and they are
+      # explicitly assessed in A1 — so the schema must allow them.
+      # Remove this line and your own extension members become lint
+      # errors, which is exactly how a team ends up with useless errors.
+      additionalProperties: true
+      properties:
+        type:
+          type: string
+          format: uri
+          description: |
+            Stable URI identifying the KIND of problem. Client code
+            branches on this exact string, so it must never change
+            once published.
+          example: https://api.library.example/problems/illegal-transition
+        title:
+          type: string
+          description: |
+            Short, human-readable, FIXED for a given type. Written for
+            a developer reading a log, not for an end user.
+          example: That status change is not permitted
+        status:
+          type: integer
+          description: The HTTP status, repeated so the document stays
+            meaningful when logged away from its response.
+          example: 409
+        detail:
+          type: string
+          description: |
+            Specific to this occurrence. Never a stack trace, an SQL
+            fragment, or an internal hostname.
+          example: rsv_9X8y7Z is checked_in; cancellation is refused.
+        instance:
+          type: string
+          description: |
+            The URI of this specific occurrence. In Chapter 9 the
+            correlation identifier goes here.
+          example: /v1/reservations/rsv_9X8y7Z/cancellation
+
+  responses:
+
+    BadRequest:
+      description: The request was malformed.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: https://api.library.example/problems/malformed-request
+            title: The request could not be parsed
+            status: 400
+
+    NotFound:
+      description: No such resource — or none you may see.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: https://api.library.example/problems/not-found
+            title: Resource not found
+            status: 404
+
+    Conflict:
+      description: |
+        The request was valid but refused by a business rule. This is a
+        domain OUTCOME, not a server error. Do not retry it.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: https://api.library.example/problems/illegal-transition
+            title: That status change is not permitted
+            status: 409
+
+    UnprocessableEntity:
+      description: Well-formed but semantically invalid.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+          example:
+            type: https://api.library.example/problems/validation-failed
+            title: One or more fields are invalid
+            status: 422
