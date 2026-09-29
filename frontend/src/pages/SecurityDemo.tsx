@@ -178,7 +178,7 @@ export const SecurityDemo: React.FC = () => {
             ...(activePersona?.token ? { Authorization: `Bearer ${activePersona.token}` } : {})
           },
           body: JSON.stringify({
-            roomId: 'room-101',
+            roomId: 'rm_1a2B3cD',
             date: '2026-11-20',
             startTime: '14:00',
             endTime: '15:00'
@@ -236,8 +236,8 @@ export const SecurityDemo: React.FC = () => {
 
     try {
       const payload = conflict
-        ? { roomId: 'room-202', date: '2026-12-01', startTime: '16:00', endTime: '18:00' }
-        : { roomId: 'room-101', date: '2026-11-25', startTime: '09:00', endTime: '11:00' };
+        ? { roomId: 'rm_2b3C4dE', date: '2026-12-01', startTime: '16:00', endTime: '18:00' }
+        : { roomId: 'rm_1a2B3cD', date: '2026-11-25', startTime: '09:00', endTime: '11:00' };
 
       const res = await fetch('/v1/reservations', {
         method: 'POST',
